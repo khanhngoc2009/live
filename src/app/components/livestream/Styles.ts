@@ -1,4 +1,4 @@
-import {StyleSheet} from 'react-native';
+import {Dimensions, StyleSheet} from 'react-native';
 
 export default StyleSheet.create({
   max: {
@@ -69,5 +69,5 @@ export default StyleSheet.create({
   },
   roomHead: {fontWeight: 'bold', color: 'red', fontSize: 16},
   whiteText: {color: 'red'},
-  video: {width: 150, height: 150},
+  video: {width: "100%", height: Dimensions.get("screen").height,borderColor:"gray",borderWidth:0.5},
 });

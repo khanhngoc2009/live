@@ -24,21 +24,12 @@ const LoginLayout = ({navigation}) => {
 
     }, [])
 
-    // Alert message
-    // if (LoginReducer.userLogin && LoginReducer.success_message) {
-    //     alert(LoginReducer.success_message)
-    // }
-    //onLogin
     const onLoginSubmit = (value) => {
         appDispatch(requestLoginThunk({ email: value.email, password: value.password }))
     }
 
     return (
         <View style={{ backgroundColor: "#511982" ,flex:1,justifyContent:"center"}}>
-            {/* <View style={{ alignItems: "center", marginTop: 20 }}>
-                <ImageStyled source={Icon_Image.logoWindSoft} />
-            </View> */}
-            
             <Formik
                 initialValues={{
                     email: 'phamva@gmail.com',

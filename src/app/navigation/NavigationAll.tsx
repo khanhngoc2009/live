@@ -15,10 +15,9 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const Navigation = () => {
     const loginUserReducer = useAppSelector(state => state.loginUserReducer)
-    console.log(loginUserReducer.isLogin);
     return (
         <NavigationContainer>
-            {!loginUserReducer.isLogin ?
+            {loginUserReducer.isLogin ?
                 <Stack.Navigator screenOptions={{
                     headerShown: false
                 }} initialRouteName={RouterName.Login_Screen}>

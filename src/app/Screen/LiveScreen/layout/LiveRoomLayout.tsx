@@ -10,6 +10,7 @@ import {
   Image,
   TouchableOpacity,
   View,
+  Dimensions,
 } from 'react-native';
 import RtcEngine, {
   RtcRemoteView,
@@ -29,8 +30,9 @@ import { Live } from '@model/index'
 import { GenericListInitialState } from '@app/Screen/GetsentryScreen/slice/GenericListInitialState';
 import axios from 'axios'
 import { ApiURL } from '@app/network/api';
-import { flatMap } from 'lodash';
+import styled from 'styled-components/native'
 import { Icon_Image } from '@assets/image';
+import { Icon } from 'react-native-vector-icons/Icon';
 interface Props { }
 
 interface State {
@@ -58,7 +60,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   const [token, setToken] = useState(null)
   const [channelName, setChannelName] = useState("")
   const [inCall, setInCall] = useState(false)
-  const [input, setInput] = useState(myPro.userLogin?.email ?? "")
+  const [input, setInput] = useState("Kahnhh")
   const [inLobby, setInLobby] = useState(false)
   const [peerIds, setPeerIds] = useState([])
   const [seniors, setSeniors] = useState([])
@@ -66,7 +68,9 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   const [rooms, setRooms] = useState({})
   const [data, setData] = useState([])
   const [role, setRole] = useState(true)
-
+  const width = Dimensions.get('window').width;
+  const Height = Dimensions.get('window').height;
+  const [comment, setComment] = useState("")
   const checkFlatForm = () => {
     if (Platform.OS === 'android') {
       requestCameraAndAudioPermission().then(() => {
@@ -74,41 +78,39 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       });
     }
   }
-
-  const getListMyProduct = () => {
-    appDispatch(requestLiveThunk())
-  }
-  useEffect(() => {
-    initRTC();
-    initRTM();
-  })
-
-  useEffect(() => {
-    checkFlatForm()
-    // getListMyProduct()
-  }, [])
+  const message = [
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã sssssss " },
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+    { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+  ]
 
   useEffect(() => {
+    checkFlatForm();
     return (() => {
       _rtmEngine?.destroyClient();
       _rtcEngine?.destroy();
     })
   }, [])
 
-  const _onCreate = (value?: Live) => {
-
-  }
-
+  useEffect(() => {
+    initRTC();
+  })
   const initRTC = async () => {
     _rtcEngine = await RtcEngine.create(appId);
     await _rtcEngine.enableVideo();
 
-    _rtcEngine.addListener('Error', (err) => {
+    await _rtcEngine.addListener('Error', (err) => {
       console.log('Error', err);
     });
-    // await _rtcEngine.setChannelProfile(ChannelProfile.LiveBroadcasting)
-    // await _rtcEngine.setDefaultAudioRoutetoSpeakerphone(true);
-    // await _rtcEngine.setClientRole(!role ? ClientRole.Audience : ClientRole.Broadcaster)
+    await _rtcEngine.setChannelProfile(ChannelProfile.LiveBroadcasting)
+    await _rtcEngine.setDefaultAudioRoutetoSpeakerphone(true);
+    await _rtcEngine.setClientRole(!role ? ClientRole.Audience : ClientRole.Broadcaster)
     _rtcEngine.addListener('UserJoined', (uid) => {
       if (peerIds.indexOf(uid) === -1) {
         if (inCall && seniors.length < 2) {
@@ -120,37 +122,35 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
         setPeerIds([...peerIds, uid]);
       }
     });
-    _rtcEngine.addListener('UserOffline', (uid) => {
+    await _rtcEngine.addListener('UserOffline', (uid) => {
       setPeerIds(peerIds.filter((id) => id !== uid))
-
     });
-    _rtcEngine.addListener(
+    await _rtcEngine.addListener(
       'JoinChannelSuccess',
       (channel, uid, elapsed) => {
         console.log('JoinChannelSuccess', channel, uid, elapsed);
         setInCall(true);
       },
     );
+    await initRTM();
   };
   const initRTM = async () => {
     _rtmEngine = new RtmEngine();
-
-    _rtmEngine.on('error', (evt) => {
+    await _rtmEngine.on('error', (evt) => {
       console.log(evt);
     });
-
-    _rtmEngine.on('channelMessageReceived', (evt) => {
+    await _rtmEngine.on('channelMessageReceived', (evt) => {
       let { text } = evt;
       let data = text.split(':');
       setRooms({ ...rooms, [data[0]]: data[1] });
     });
+    await _rtmEngine.on('messageReceived', (evt) => {
 
-    _rtmEngine.on('messageReceived', (evt) => {
       let { text } = evt;
       let data = text.split(':');
       setRooms({ ...rooms, [data[0]]: data[1] });
     });
-    _rtmEngine.on('channelMemberJoined', (evt) => {
+    await _rtmEngine.on('channelMemberJoined', (evt) => {
       let { channelId, uid } = evt;
       if (inCall && channelId === 'lobby' && seniors.length < 2) {
         _rtmEngine
@@ -158,11 +158,10 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             peerId: uid,
             text: channelName + ':' + (peerIds.length + 1),
             offline: false,
-          })
-          .catch((e) => console.log(e));
+          }).catch((e) => console.log(e));
       }
     });
-    _rtmEngine.on('channelMemberLeft', (evt) => {
+    await _rtmEngine.on('channelMemberLeft', (evt) => {
       let { channelId, uid } = evt;
       if (channelName === channelId) {
         setSeniors(seniors.filter((id) => id !== uid));
@@ -172,12 +171,10 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             ?.sendMessageByChannelId(
               'lobby',
               channelName + ':' + (peerIds.length + 1),
-            )
-            .catch((e) => console.log(e));
+            ).catch((e) => console.log(e));
         }
       }
     });
-
     await _rtmEngine.createClient(appId).catch((e) => console.log(e));
     await _rtmEngine
       ?.login({ uid: myUsername })
@@ -186,7 +183,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
     await _rtmEngine?.joinChannel('lobby').catch((e) => console.log(e));
     if (!inCall) {
       setInLobby(true);
-    } else setInLobby(false)
+    }
   };
 
   const joinCall = async (channelName: string) => {
@@ -202,9 +199,11 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
         ?.sendMessageByChannelId('lobby', channelName + ':' + 1)
         .catch((e) => console.log(e));
     }
+    setInCall(true)
     setInLobby(false);
     setSeniors(members.map((m: any) => m.uid))
   };
+
   const endCall = async () => {
     try {
       if (seniors.length < 2) {
@@ -230,63 +229,45 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       <View style={styles.fullView}>
         <ScrollView>
           {Object.keys(rooms).map((key, index) => {
-            if (rooms[key] != 0) {
-              return (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => joinCall(key)}
-                  style={{
-                    width: 180,
-                    height: 180,
-                    backgroundColor: "white",
-                    padding: 5
-                  }}>
-                  <View style={{
-                    height: 25,
-                    width: "60%",
-                    alignItems: "center",
-                    flexDirection: "row",
-                  }}>
-                    <View style={{
-                      width: "50%",
-                      height: 25,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      flexDirection: "row",
-                      backgroundColor: "red",
-                      borderBottomLeftRadius: 10,
-                      borderTopLeftRadius: 10
+            return (
+              <TouchableOpacity
+                key={index}
+                onPress={async () => {
+                  await setRole(false)
+                  await joinCall(key)
+                }}
+                style={{
+                  width: 180,
+                  height: 180,
+                  backgroundColor: "white",
+                  padding: 5
+                }}>
+                <View style={{
+                  height: 25,
+                  width: "60%",
+                  alignItems: "center",
+                  flexDirection: "row",
+                }}>
+                  <ViewLeftBtnRender >
+                    <View style={{ width: 5, height: 5, backgroundColor: "white", borderRadius: 3 }} />
+                    <Text style={{ color: "white", fontWeight: "bold", marginLeft: 5, fontSize: 12 }}>Live</Text>
+                  </ViewLeftBtnRender>
+                  <View style={{ width: "50%" }}>
+                    <ViewRightBtnRender />
+                    <Text style={{
+                      color: "white",
+                      marginLeft: 5,
+                      fontSize: 12,
+                      position: "absolute",
+                      marginVertical: 5,
+                      marginHorizontal: 5
                     }}>
-                      <View style={{ width: 5, height: 5, backgroundColor: "white", borderRadius: 3 }} />
-                      <Text style={{ color: "white", fontWeight: "bold", marginLeft: 5, fontSize: 12 }}>Live</Text>
-                    </View>
-                    <View style={{ width: "50%" }}>
-                      <View style={{
-                        width: "100%",
-                        height: 25,
-                        justifyContent: "center",
-                        alignItems: "center",
-                        flexDirection: "row",
-                        backgroundColor: "black",
-                        borderBottomRightRadius: 10,
-                        borderTopRightRadius: 10,
-                        opacity: 0.2
-                      }} />
-                      <Text style={{
-                        color: "white",
-                        marginLeft: 5,
-                        fontSize: 12,
-                        position: "absolute",
-                        marginVertical: 5,
-                        marginHorizontal: 5
-                      }}>
-                        <Image source={Icon_Image.eye_ic}
-                          style={{ width: 10, height: 10 }} />  {rooms[key]}</Text>
-                    </View>
+                      <Image source={Icon_Image.eye_ic}
+                        style={{ width: 10, height: 10 }} />  {rooms[key]}</Text>
                   </View>
-                </TouchableOpacity>
-              );
-            }
+                </View>
+              </TouchableOpacity>
+            );
           })}
           <Text>
             {Object.keys(rooms).length === 0
@@ -297,6 +278,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
         <View style={{ alignItems: "center" }}>
           <TouchableOpacity
             onPress={async () => {
+              setRole(true)
               input ? await joinCall(input) : null;
             }}
             style={{
@@ -319,7 +301,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
 
   const _renderCall = () => {
     return inCall ? (
-      <View style={styles.fullView}>
+      <View style={{}}>
         <RtcLocalView.SurfaceView
           style={styles.video}
           channelId={channelName}
@@ -338,24 +320,162 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             );
           })}
         </ScrollView>
-        <TouchableOpacity onPress={endCall} style={styles.button}>
-          <Text style={styles.buttonText}>Leave Room</Text>
-        </TouchableOpacity>
+        <View style={{
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          width: "100%",
+          height: 100,
+          position: "absolute"
+        }}>
+          <View style={{ flexDirection: "row", }}>
+            <View style={{
+              height: 32,
+              width: 32,
+              borderRadius: 16,
+              backgroundColor: "white",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+            >
+              <Image source={Icon_Image.image_boy_profile} style={{ height: 30, width: 30, borderRadius: 15 }} />
+            </View>
+            <View>
+              <Text style={{ color: "black", fontWeight: "bold" }}>
+                {"   " + channelName}
+              </Text>
+              <Text style={{
+                color: "black",
+                marginLeft: 10,
+                fontSize: 12,
+              }}>
+                <Image source={Icon_Image.eye_ic}
+                  style={{ width: 10, height: 10 }} />  10</Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={async () => {
+            await endCall()
+          }} style={{
+
+          }}>
+            <Image source={Icon_Image.x_ic} style={{ height: 20, width: 20, borderRadius: 15 }} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={{
+          width: "100%",
+          position: "absolute",
+          // backgroundColor: "red",
+          top: Height / 2 - 100,
+          justifyContent: "space-between",
+          height: Height / 2 - 25
+        }}>
+          <ScrollView style={{
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            width: "70%",
+            height: 250,
+            // backgroundColor: "red",
+          }}>
+            {message.map((v, ind) => {
+              return (
+                <View key={ind} style={{ marginVertical: 5, flexDirection: "row", alignItems: "center" }}>
+                  <Image source={Icon_Image.image_boy_profile} style={{ height: 25, width: 25, borderRadius: 13 }} />
+                  <View style={{
+                    backgroundColor: 'rgba(52, 52, 52, 0.5)',
+                    borderRadius: 15,
+                    marginLeft: 10,
+                    justifyContent: "center",
+                    paddingHorizontal: 15,
+                    paddingVertical: 10
+                  }}>
+                    <Text style={{ color: "white" }}>{v.Name}:{v.message}</Text>
+                  </View>
+                </View>
+              )
+            })}
+          </ScrollView>
+          <View style={{
+            // backgroundColor:"red",
+            height: 60,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-around"
+          }}>
+            <TouchableOpacity
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 25,
+                backgroundColor: 'rgba(52, 52, 52, 0.5)',
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              onPress={() => { }}>
+                <Image source={Icon_Image.shopping_bag} style={{width:20,height:20}}/>
+            </TouchableOpacity>
+            <View style={{
+              width: "50%",
+              height: 40,
+              borderRadius: 25,
+              backgroundColor: 'rgba(52, 52, 52, 0.6)',
+              flexDirection:"row",
+              alignItems:"center",
+              justifyContent:"space-around"
+            }}>
+              <TextInput
+                value={comment}
+                onChangeText={(t) => { setComment(t) }}
+                placeholder="comment..."
+                placeholderTextColor="white"
+                style={{
+                  width: "75%",
+                  height: 40,
+                  borderRadius: 25,
+                  // backgroundColor: 'rgba(52, 52, 52, 0.8)',
+                  color: "white",
+                  padding: 5,
+                }}
+              />
+              <TouchableOpacity><Image source={Icon_Image.send_ic} style={{width:20,height:20}}/></TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 25,
+                backgroundColor: 'rgba(52, 52, 52, 0.5)',
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              onPress={() => { }}>
+                <Image source={Icon_Image.share} style={{width:20,height:20}}/>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 25,
+                backgroundColor: 'rgba(52, 52, 52, 0.5)',
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              onPress={() => { }}>
+                <Image source={Icon_Image.heart_ic} style={{width:25,height:25,borderRadius:13}}/>
+            </TouchableOpacity>
+          </View>
+          <View />
+        </View>
       </View>
     ) : null;
   };
-
   return (
     <SafeAreaView style={styles.max}>
-      <GoBackLayout title="Live Room"
+      {!inCall && <GoBackLayout title="Live Room"
         onClickIcon={() => {
           navigation.goBack();
-        }} />
-      <View style={styles.spacer}>
-        <Text style={styles.roleText}>
-          {inCall ? "You're in " + channelName : 'Lobby: Join/Create a room'}
-        </Text>
-      </View>
+        }} />}
       {_renderRooms()}
       {_renderCall()}
       {!inLobby && !inCall ? (
@@ -371,3 +491,25 @@ const mapDispatchToProps = {
   requestLiveThunk
 };
 export default connect(mapStateToProps, mapDispatchToProps)(LiveRoomLayout);
+
+const ViewLeftBtnRender = styled.View`
+width: 50%
+height: 25px
+justifyContent: center
+alignItems: center
+flexDirection: row
+backgroundColor: red
+borderBottomLeftRadius: 10px
+borderTopLeftRadius: 10px
+`
+const ViewRightBtnRender = styled.View`
+width: 100%
+height: 25px
+justifyContent: center
+alignItems: center
+flexDirection: row
+backgroundColor: black
+borderBottomRightRadius: 10px
+borderTopRightRadius: 10px
+opacity: 0.2
+`
