@@ -66,7 +66,6 @@ const LiveScreenLayout = ({ navigation }, props: State) => {
     };
     const checkFlatForm = () => {
         if (Platform.OS === 'android') {
-            // Request required permissions from Android
             requestCameraAndAudioPermission().then(() => {
                 console.log('requested!');
             });
@@ -110,7 +109,6 @@ const LiveScreenLayout = ({ navigation }, props: State) => {
         _engine.addListener('UserOffline', (uid, reason) => {
             setPeerIds(peerIds.filter(id => id !== uid))
         })
-
         _engine.addListener('JoinChannelSuccess', (channel, uid, elapsed) => {
             setJoinSucceed(true)
             setStart(true)

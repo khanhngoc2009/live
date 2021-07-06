@@ -7,6 +7,7 @@ import {
   ScrollView,
   Text,
   TextInput,
+  Image,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -29,6 +30,7 @@ import { GenericListInitialState } from '@app/Screen/GetsentryScreen/slice/Gener
 import axios from 'axios'
 import { ApiURL } from '@app/network/api';
 import { flatMap } from 'lodash';
+import { Icon_Image } from '@assets/image';
 interface Props { }
 
 interface State {
@@ -56,7 +58,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   const [token, setToken] = useState(null)
   const [channelName, setChannelName] = useState("")
   const [inCall, setInCall] = useState(false)
-  const [input, setInput] = useState(myPro.userLogin?.email??"")
+  const [input, setInput] = useState(myPro.userLogin?.email ?? "")
   const [inLobby, setInLobby] = useState(false)
   const [peerIds, setPeerIds] = useState([])
   const [seniors, setSeniors] = useState([])
@@ -72,7 +74,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       });
     }
   }
-  
+
   const getListMyProduct = () => {
     appDispatch(requestLiveThunk())
   }
@@ -118,8 +120,6 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
         setPeerIds([...peerIds, uid]);
       }
     });
-
-
     _rtcEngine.addListener('UserOffline', (uid) => {
       setPeerIds(peerIds.filter((id) => id !== uid))
 
@@ -132,7 +132,6 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       },
     );
   };
-
   const initRTM = async () => {
     _rtmEngine = new RtmEngine();
 
@@ -151,7 +150,6 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       let data = text.split(':');
       setRooms({ ...rooms, [data[0]]: data[1] });
     });
-
     _rtmEngine.on('channelMemberJoined', (evt) => {
       let { channelId, uid } = evt;
       if (inCall && channelId === 'lobby' && seniors.length < 2) {
@@ -164,7 +162,6 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
           .catch((e) => console.log(e));
       }
     });
-
     _rtmEngine.on('channelMemberLeft', (evt) => {
       let { channelId, uid } = evt;
       if (channelName === channelId) {
@@ -194,8 +191,6 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
 
   const joinCall = async (channelName: string) => {
     setChannelName(channelName)
-    // setState({ channelName:channelName});
-
     await _rtcEngine?.joinChannel(token, channelName, null, 0);
     await _rtmEngine?.joinChannel(channelName)
       .catch((e) => console.log(e));
@@ -217,7 +212,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
           ?.sendMessageByChannelId('lobby', channelName + ':' + peerIds.length)
           .catch((e) => console.log(e));
       }
-      Alert.alert("Message","đã thoát stream")
+      Alert.alert("Message", "đã thoát stream")
       await _rtcEngine?.leaveChannel();
       await _rtmEngine?.logout();
       await _rtmEngine?.login({ uid: myUsername });
@@ -233,7 +228,6 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   const _renderRooms = () => {
     return inLobby ? (
       <View style={styles.fullView}>
-        <Text style={styles.subHeading}>Room List</Text>
         <ScrollView>
           {Object.keys(rooms).map((key, index) => {
             if (rooms[key] != 0) {
@@ -241,17 +235,58 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
                 <TouchableOpacity
                   key={index}
                   onPress={() => joinCall(key)}
-                  style={styles.roomsBtn}>
-                  <Text>
-                    <Text style={styles.roomHead}>{key}</Text>
-                    <Text style={styles.whiteText}>
-                      {' (' + rooms[key] + ' users)'}
-                    </Text>
-                  </Text>
+                  style={{
+                    width: 180,
+                    height: 180,
+                    backgroundColor: "white",
+                    padding: 5
+                  }}>
+                  <View style={{
+                    height: 25,
+                    width: "60%",
+                    alignItems: "center",
+                    flexDirection: "row",
+                  }}>
+                    <View style={{
+                      width: "50%",
+                      height: 25,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      flexDirection: "row",
+                      backgroundColor: "red",
+                      borderBottomLeftRadius: 10,
+                      borderTopLeftRadius: 10
+                    }}>
+                      <View style={{ width: 5, height: 5, backgroundColor: "white", borderRadius: 3 }} />
+                      <Text style={{ color: "white", fontWeight: "bold", marginLeft: 5, fontSize: 12 }}>Live</Text>
+                    </View>
+                    <View style={{ width: "50%" }}>
+                      <View style={{
+                        width: "100%",
+                        height: 25,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        flexDirection: "row",
+                        backgroundColor: "black",
+                        borderBottomRightRadius: 10,
+                        borderTopRightRadius: 10,
+                        opacity: 0.2
+                      }} />
+                      <Text style={{
+                        color: "white",
+                        marginLeft: 5,
+                        fontSize: 12,
+                        position: "absolute",
+                        marginVertical: 5,
+                        marginHorizontal: 5
+                      }}>
+                        <Image source={Icon_Image.eye_ic}
+                          style={{ width: 10, height: 10 }} />  {rooms[key]}</Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               );
             }
-
           })}
           <Text>
             {Object.keys(rooms).length === 0
@@ -259,19 +294,25 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
               : null}
           </Text>
         </ScrollView>
-        <TextInput
-          value={input}
-          onChangeText={(val) => setInput(val)}
-          style={styles.input}
-          placeholder={myPro.userLogin?.name}
-        />
-        <TouchableOpacity
-          onPress={async () => {
-            input? await joinCall(input):null;
-          }}
-          style={styles.button}>
-          <Text style={styles.buttonText}>Create Room</Text>
-        </TouchableOpacity>
+        <View style={{ alignItems: "center" }}>
+          <TouchableOpacity
+            onPress={async () => {
+              input ? await joinCall(input) : null;
+            }}
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              backgroundColor: 'red',
+              marginBottom: 16,
+              borderRadius: 30,
+              width: 60,
+              height: 60,
+              justifyContent: "center",
+              alignItems: "center"
+            }}>
+            <Text style={{ color: "white", fontWeight: "bold", fontSize: 13 }}>Live</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     ) : null;
   };

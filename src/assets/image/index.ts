@@ -25,5 +25,6 @@ export const Icon_Image={
     go_back_ic:require("./left-arrow.png"),
     live_image_live_stream_screen:require("./live_image_livestream_screen.png"),
     phone_call_ic:require("./telephone.png"),
-    image_boy_profile:require("./image_boy_profile.jpeg")
+    image_boy_profile:require("./image_boy_profile.jpeg"),
+    eye_ic:require("./eye.png")
 }
