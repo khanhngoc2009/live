@@ -5,6 +5,6 @@ interface Live {
     uid?:string,
     channel?:string,
     token?:string,
-    user?:number,
+    users?:number,
     appId?:string,
 }

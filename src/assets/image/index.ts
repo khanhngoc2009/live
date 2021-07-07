@@ -30,4 +30,5 @@ export const Icon_Image={
     send_ic:require("./send.png"),
     shopping_bag:require("./shopping-bag.png"),
     heart_ic:require("./heart.png"),
+    image_live_example:require("./image_live_example.jpeg")
 }
