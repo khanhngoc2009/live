@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from '@app/store'
 import { TextField } from '@components'
 import { Formik } from 'formik';
 import * as Yup from 'yup';
-import styled from 'styled-components/native'
+import styled from 'styled-components'
 const SignupSchema = Yup.object().shape({
     email: Yup.string().required('Bạn cần nhập email'),
     password: Yup.string()

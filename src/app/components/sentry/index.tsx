@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { View, Text, Image } from 'react-native'
 
-import styled from 'styled-components/native'
+import styled from 'styled-components'
 import { Icon_Image } from '../../../assets/image' ;
 interface State {
     item?: any;

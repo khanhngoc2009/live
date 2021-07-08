@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import styled from 'styled-components/native'
+import styled from 'styled-components'
 import { requestCameraAndAudioPermission, Style, GoBackLayout as GoBack } from "@components";
 import {
     Platform,

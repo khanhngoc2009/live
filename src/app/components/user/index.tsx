@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { User } from '../../model/user'
 import { View ,Text} from 'react-native'
-import styled from 'styled-components/native';
+import styled from 'styled-components';
 interface State {
     item: User
 }

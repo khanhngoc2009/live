@@ -2,7 +2,7 @@ import React from "react";
 import { Platform, View, ImageBackground, ScrollView, TouchableOpacity } from "react-native";
 import { GoBackLayout as GoBack } from '@components'
 import { RouterName } from "@app/navigation/router_name";
-import styled from 'styled-components/native'
+import styled from 'styled-components'
 import { Icon_Image } from "@assets/image";
 import { useAppDispatch, useAppSelector } from '@app/store'
 import { logout } from "@screen/AuthScreen/slice/LoginUserSlice";

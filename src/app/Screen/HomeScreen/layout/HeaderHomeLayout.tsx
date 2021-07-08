@@ -2,7 +2,7 @@ import { RouterName } from "@app/navigation/router_name";
 import { Icon_Image } from "@assets/image";
 import React, { useState } from "react";
 import {Platform } from 'react-native'
-import styled from 'styled-components/native'
+import styled from 'styled-components'
 const HeaderHomeLayout = ({navigation}) => {
     const [search, setSearch] = useState("")
     return (

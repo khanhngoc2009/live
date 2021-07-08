@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from '@app/store'
 import { TextField } from '@components'
 import { Formik } from 'formik';
 import * as Yup from 'yup';
-import styled from 'styled-components/native'
+import styled from 'styled-components'
 import { Icon_Image } from '@assets/image';
 import { requestUserThunk } from '@screen/AuthScreen/slice/RegisterUserSlice';
 import { RouterName } from '@navigation/router_name';

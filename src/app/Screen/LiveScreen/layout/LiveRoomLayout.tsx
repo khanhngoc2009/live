@@ -31,7 +31,7 @@ import { Live } from '@model/index'
 import { GenericListInitialState } from '@app/Screen/GetsentryScreen/slice/GenericListInitialState';
 import axios from 'axios'
 import { ApiURL } from '@app/network/api';
-import styled from 'styled-components/native'
+import styled from 'styled-components'
 import { Icon_Image } from '@assets/image';
 import { Icon } from 'react-native-vector-icons/Icon';
 interface Props { }
@@ -69,13 +69,13 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   const [myUsername, setMyUsername] = useState("" + new Date().getTime())
   const [rooms, setRooms] = useState({})
   const [data, setData] = useState(props.data ?? [])
-  const [role, setRole] = useState(true)
+  const [role, setRole] = useState(false)
   const width = Dimensions.get('window').width;
   const Height = Dimensions.get('window').height;
   const [comment, setComment] = useState("")
   const [count, setCount] = useState(0);
   const [v, setV] = useState(props.live)
-
+  const [start, setStart] = useState(false)
   const checkFlatForm = () => {
     if (Platform.OS === 'android') {
       requestCameraAndAudioPermission().then(() => {
@@ -93,11 +93,10 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
     })
   }
   const getAllLiveStreaming = async () => {
+
     await axios.get(ApiURL.Live).then((res) => {
       if (res.status === 200) {
         setData(res.data)
-        console.log(res.data);
-
       }
     }).catch((e) => {
       console.log(e);
@@ -118,18 +117,18 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
 
   useEffect(() => {
     checkFlatForm();
-    getAllLiveStreaming()
+    getAllLiveStreaming();
     return (() => {
       _rtmEngine?.destroyClient();
       _rtcEngine?.destroy();
     })
   }, [])
-
   useEffect(() => {
     initRTC();
     if (count === 0 && v && role) {
       CreateLiveRoom(v);
     }
+    
   })
   const initRTC = async () => {
     _rtcEngine = await RtcEngine.create(appId);
@@ -142,20 +141,18 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
     await _rtcEngine.setClientRole(!role ? ClientRole.Audience : ClientRole.Broadcaster)
     _rtcEngine.addListener('UserJoined', (uid) => {
       console.log(uid);
-      
+      setPeerIds([...peerIds,uid])
     });
     await _rtcEngine.addListener('UserOffline', (uid) => {
       console.log(uid);
-      
-      // let val=data.find((e)=>e.channel===channelName)
+      // let val = data.find((e) => e.channel === channelName)
       // console.log(val);
-      
-      // if(val.uid===uid){
+
+      // if (val.uid === uid) {
       //   setInCall(false);
       //   setInLobby(true);
       // }
     });
-
     await _rtcEngine.addListener(
       'JoinChannelSuccess',
       (channel, uid, elapsed) => {
@@ -181,17 +178,6 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
     await _rtmEngine.on('error', (evt) => {
       // console.log(evt);
     });
-    await _rtmEngine.on('channelMessageReceived', (evt) => {
-      let { text } = evt;
-      let data = text.split(':');
-      setRooms({ ...rooms, [data[0]]: data[1] });
-    });
-    await _rtmEngine.on('messageReceived', (evt) => {
-
-      let { text } = evt;
-      let data = text.split(':');
-      setRooms({ ...rooms, [data[0]]: data[1] });
-    });
     await _rtmEngine.on('channelMemberJoined', (evt) => {
       let { channelId, uid } = evt;
       if (inCall && channelId === 'lobby' && seniors.length < 2) {
@@ -200,7 +186,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             peerId: uid,
             text: channelName + ':' + (peerIds.length + 1),
             offline: false,
-          }).catch((e) => {});
+          }).catch((e) => { });
       }
     });
     await _rtmEngine.on('channelMemberLeft', (evt) => {
@@ -213,49 +199,45 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             ?.sendMessageByChannelId(
               'lobby',
               channelName + ':' + (peerIds.length + 1),
-            ).catch((e) => {});
+            ).catch((e) => { });
         }
       }
     });
-    await _rtmEngine.createClient(appId).catch((e) => {});
-    await _rtmEngine
-      ?.login({ uid: myUsername })
-      .catch((e) => {});
-
-    await _rtmEngine?.joinChannel('lobby').catch((e) => {});
     if (!inCall) {
       setInLobby(true);
+    }
+
+    await _rtmEngine.createClient(appId).catch((e) => { });
+    if (start) {
+      await _rtmEngine
+        ?.login({ uid: myUsername })
+        .catch((e) => { });
+      await _rtmEngine?.joinChannel('lobby')
+        .catch((e) => { });
+      setInLobby(false);
     }
   };
   const joinCall = async (channelName: string) => {
     setChannelName(channelName)
+    setInCall(true)
     await _rtcEngine?.joinChannel(token, channelName, null, 0);
     await _rtmEngine?.joinChannel(channelName)
-      .catch((e) => {});
+      .catch((e) => { });
     let { members } = await _rtmEngine?.getChannelMembersBychannelId(
       channelName,
     );
     if (members.length === 1) {
       await _rtmEngine
         ?.sendMessageByChannelId('lobby', channelName + ':' + 1)
-        .catch((e) => {});
+        .catch((e) => { });
     }
-    setInCall(true)
     setInLobby(false);
     setSeniors(members.map((m: any) => m.uid))
   };
   const endCall = async () => {
     try {
-      if (seniors.length < 2) {
-        await _rtmEngine
-          ?.sendMessageByChannelId('lobby', channelName + ':' + peerIds.length)
-          .catch((e) => console.log(e));
-      }
       Alert.alert("Message", "đã thoát stream")
       await _rtcEngine?.leaveChannel();
-      await _rtmEngine?.logout();
-      await _rtmEngine?.login({ uid: myUsername });
-      await _rtmEngine?.joinChannel('lobby');
       if (role) {
         let val = data.find((e) => e.channel === channelName)
         await axios.delete(`${ApiURL.Live}/${val.id}`).then((res) => {
@@ -269,7 +251,8 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       setInLobby(true);
       setSeniors([]);
       setChannelName('');
-      setRole(false)
+      setRole(false);
+      setStart(false);
     } catch (error) {
     }
   };
@@ -282,6 +265,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
               <TouchableOpacity
                 key={index}
                 onPress={async () => {
+                  setInLobby(false);
                   await setRole(false)
                   await joinCall(value.channel)
                 }}
@@ -332,6 +316,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             onPress={async () => {
               let value = data?.filter((e) => e.channel === input)
               if (value?.length == 0) {
+                setStart(true);
                 setRole(true)
                 setCount(0);
                 await joinCall(input)
@@ -437,15 +422,15 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             width: "100%",
             justifyContent: "space-between",
           }}>
-            <ScrollView 
-            
-            style={{
-              paddingHorizontal: 20,
-              marginVertical: 15,
-              width: "70%",
-              height: 250,
-              
-            }}>
+            <ScrollView
+
+              style={{
+                paddingHorizontal: 20,
+                marginVertical: 15,
+                width: "70%",
+                height: 250,
+
+              }}>
               {message.map((v, ind) => {
                 return (
                   <View key={ind} style={{ marginVertical: 5, flexDirection: "row", alignItems: "center" }}>

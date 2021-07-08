@@ -1,5 +1,5 @@
 import React, { JSXElementConstructor, useState } from 'react';
-import styled from 'styled-components/native';
+import styled from 'styled-components';
 import { Icon_Image } from '../../../assets/image';
 
 interface State {
