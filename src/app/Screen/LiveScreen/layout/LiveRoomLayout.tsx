@@ -34,6 +34,7 @@ import { ApiURL } from '@app/network/api';
 import styled from 'styled-components/native'
 import { Icon_Image } from '@assets/image';
 import { Icon } from 'react-native-vector-icons/Icon';
+import { RTMEventCallback } from 'agora-react-native-rtm/lib/types';
 interface Props { }
 
 interface State {
@@ -64,7 +65,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   const [inCall, setInCall] = useState(false)
   const [input, setInput] = useState("thailan livestream")
   const [inLobby, setInLobby] = useState(false)
-  const [peerIds, setPeerIds] = useState([])
+  const [peerIds, setPeerIds] = useState(props.peerIds)
   const [seniors, setSeniors] = useState([])
   const [myUsername, setMyUsername] = useState("" + new Date().getTime())
   const [rooms, setRooms] = useState({})
@@ -179,8 +180,19 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   };
   const initRTM = async () => {
     _rtmEngine = await new RtmEngine();
-    _rtmEngine.on('error', (evt) => {
-      // console.log(evt);
+
+    _rtmEngine.on('error',(evt)=>{
+
+    });
+    await _rtmEngine.on('channelMessageReceived', (evt) => {
+      let { text } = evt;
+      let data = text.split(':');
+      setRooms({ ...rooms, [data[0]]: data[1] });
+    });
+    await _rtmEngine.on('messageReceived', (evt) => {
+      let { text } = evt;
+      let data = text.split(':');
+      setRooms({ ...rooms, [data[0]]: data[1] });
     });
     _rtmEngine.on('channelMemberJoined', (evt) => {
       let { channelId, uid } = evt;
@@ -221,7 +233,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       setInLobby(false);
     }
   };
-  const joinCall = async (channelName: string) => {
+  const joinCall = async (channelName: any) => {
     setChannelName(channelName)
     setInCall(true)
     await _rtcEngine?.joinChannel(token, channelName, null, 0);
@@ -268,7 +280,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
     return inLobby ? (
       <View style={styles.fullView}>
         <ScrollView horizontal={true}>
-          {data?.map((value, index) => {
+          {data?.map((value:Live, index) => {
             return (
               <TouchableOpacity
                 key={index}
@@ -504,7 +516,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
                 />
                 <TouchableOpacity
                   onPress={() => {
-                    message ? console.log(message) : null;
+                    console.log(comment) ;
                   }}
                 >
                   <Image source={Icon_Image.send_ic} style={{ width: 20, height: 20 }} />
