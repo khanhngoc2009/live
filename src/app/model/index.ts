@@ -2,4 +2,5 @@
 import { User,initialState} from "./user";
 import {Notification} from './notification'
 import {Live} from './live'
-export {User,initialState,Notification,Live}
+import {Message} from './message'
+export {User,initialState,Notification,Live,Message}

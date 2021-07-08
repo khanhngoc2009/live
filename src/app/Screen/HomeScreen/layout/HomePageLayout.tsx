@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, ImageBackground, Text, Platform, Image, ScrollView } from 'react-native';
-import styled from 'styled-components';
+import styled from 'styled-components/native';
 
 import { useAppDispatch, useAppSelector } from '@app/store';
 import { Icon_Image } from '@assets/image';

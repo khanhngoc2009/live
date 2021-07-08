@@ -5,7 +5,7 @@ import RadioForm from 'react-native-simple-radio-button';
 import { useAppDispatch, useAppSelector } from '@app/store'
 import { Formik } from 'formik';
 import { TextField,GoBackLayout as GoBack } from '@components/index'
-import styled from 'styled-components'
+import styled from 'styled-components/native'
 import {requestUserThunk} from '@screen/AuthScreen/slice/RegisterUserSlice'
 import {SentryLayout} from '@components'
 // Validate Form 

@@ -31,7 +31,7 @@ import { Live } from '@model/index'
 import { GenericListInitialState } from '@app/Screen/GetsentryScreen/slice/GenericListInitialState';
 import axios from 'axios'
 import { ApiURL } from '@app/network/api';
-import styled from 'styled-components'
+import styled from 'styled-components/native'
 import { Icon_Image } from '@assets/image';
 import { Icon } from 'react-native-vector-icons/Icon';
 interface Props { }
@@ -69,13 +69,14 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   const [myUsername, setMyUsername] = useState("" + new Date().getTime())
   const [rooms, setRooms] = useState({})
   const [data, setData] = useState(props.data ?? [])
-  const [role, setRole] = useState(false)
+  const [role, setRole] = useState(true)
   const width = Dimensions.get('window').width;
   const Height = Dimensions.get('window').height;
   const [comment, setComment] = useState("")
   const [count, setCount] = useState(0);
   const [v, setV] = useState(props.live)
   const [start, setStart] = useState(false)
+  const [timer, setTimer] = useState(0);
   const checkFlatForm = () => {
     if (Platform.OS === 'android') {
       requestCameraAndAudioPermission().then(() => {
@@ -87,22 +88,17 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
     setCount(2)
     await axios.post(ApiURL.Live, params).then((res) => {
       setData([...data, res.data]);
-      setV(null);
-
+      setV(props.live);
     }).catch((e) => {
     })
   }
   const getAllLiveStreaming = async () => {
-
-    await axios.get(ApiURL.Live).then((res) => {
-      if (res.status === 200) {
-        setData(res.data)
-      }
-    }).catch((e) => {
-      console.log(e);
-
+    const result = await axios.get(ApiURL.Live).then((r)=>{
+      return r
     })
+    setData(result.data)
   }
+
   const message = [
     { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
     { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
@@ -123,17 +119,28 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       _rtcEngine?.destroy();
     })
   }, [])
+  // useEffect(() => {
+  //   getAllLiveStreaming();
+  // }, [timer])
+
+  // useEffect(() => {
+  //   setTimeout(
+  //     function () {
+  //       setTimer(timer + 1);
+  //     },1000);
+  // })
   useEffect(() => {
     initRTC();
     if (count === 0 && v && role) {
       CreateLiveRoom(v);
     }
-    
   })
+  
+
   const initRTC = async () => {
     _rtcEngine = await RtcEngine.create(appId);
     role ? await _rtcEngine.enableVideo() : _rtcEngine.disableVideo();
-    await _rtcEngine.addListener('Error', (err) => {
+    _rtcEngine.addListener('Error', (err) => {
       // console.log('Error', err);
     });
     await _rtcEngine.setChannelProfile(ChannelProfile.LiveBroadcasting)
@@ -141,19 +148,13 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
     await _rtcEngine.setClientRole(!role ? ClientRole.Audience : ClientRole.Broadcaster)
     _rtcEngine.addListener('UserJoined', (uid) => {
       console.log(uid);
-      setPeerIds([...peerIds,uid])
+      setPeerIds([...peerIds, uid])
     });
-    await _rtcEngine.addListener('UserOffline', (uid) => {
+    _rtcEngine.addListener('UserOffline', (uid) => {
       console.log(uid);
-      // let val = data.find((e) => e.channel === channelName)
-      // console.log(val);
 
-      // if (val.uid === uid) {
-      //   setInCall(false);
-      //   setInLobby(true);
-      // }
     });
-    await _rtcEngine.addListener(
+    _rtcEngine.addListener(
       'JoinChannelSuccess',
       (channel, uid, elapsed) => {
         console.log('JoinChannelSuccess', channel, uid, elapsed);
@@ -165,20 +166,23 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             token: token,
             users: 0,
             appId: appId,
+            messages: [],
+            status: false
           };
           setV(v)
         }
         setInCall(true);
+        setInLobby(false);
       },
     );
     initRTM();
   };
   const initRTM = async () => {
-    _rtmEngine = new RtmEngine();
-    await _rtmEngine.on('error', (evt) => {
+    _rtmEngine = await new RtmEngine();
+    _rtmEngine.on('error', (evt) => {
       // console.log(evt);
     });
-    await _rtmEngine.on('channelMemberJoined', (evt) => {
+    _rtmEngine.on('channelMemberJoined', (evt) => {
       let { channelId, uid } = evt;
       if (inCall && channelId === 'lobby' && seniors.length < 2) {
         _rtmEngine
@@ -189,7 +193,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
           }).catch((e) => { });
       }
     });
-    await _rtmEngine.on('channelMemberLeft', (evt) => {
+    _rtmEngine.on('channelMemberLeft', (evt) => {
       let { channelId, uid } = evt;
       if (channelName === channelId) {
         setSeniors(seniors.filter((id) => id !== uid));
@@ -207,12 +211,12 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
       setInLobby(true);
     }
 
-    await _rtmEngine.createClient(appId).catch((e) => { });
+    _rtmEngine.createClient(appId).catch((e) => { });
     if (start) {
-      await _rtmEngine
+      _rtmEngine
         ?.login({ uid: myUsername })
         .catch((e) => { });
-      await _rtmEngine?.joinChannel('lobby')
+      _rtmEngine?.joinChannel('lobby')
         .catch((e) => { });
       setInLobby(false);
     }
@@ -238,10 +242,14 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
     try {
       Alert.alert("Message", "đã thoát stream")
       await _rtcEngine?.leaveChannel();
+      console.log(role);
+      
       if (role) {
         let val = data.find((e) => e.channel === channelName)
-        await axios.delete(`${ApiURL.Live}/${val.id}`).then((res) => {
+        await axios.delete(`${ApiURL.Live}/${val?.id}`).then((res) => {
           setData(data.filter((id) => id.id !== res.data.id))
+          console.log(res.data);
+          
         }).catch((e) => {
           console.log(e);
         })
@@ -344,6 +352,9 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
   const switchCamera = async () => {
     await _rtcEngine?.switchCamera()
   }
+  const onSendMessage = () => {
+
+  }
   const _renderCall = () => {
     return inCall ? (
       <View style={{}}>
@@ -414,7 +425,7 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
             }} style={{
               // margin:10
             }}>
-              <Image source={Icon_Image.x_ic} style={{ height: 20, width: 20, borderRadius: 15 }} />
+              <Image source={Icon_Image.close_ic} style={{ height: 20, width: 20, borderRadius: 15 }} />
             </TouchableOpacity>
           </View>
 
@@ -491,7 +502,13 @@ const LiveRoomLayout = ({ navigation }, props: State) => {
                     padding: 5,
                   }}
                 />
-                <TouchableOpacity><Image source={Icon_Image.send_ic} style={{ width: 20, height: 20 }} /></TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    message ? console.log(message) : null;
+                  }}
+                >
+                  <Image source={Icon_Image.send_ic} style={{ width: 20, height: 20 }} />
+                </TouchableOpacity>
               </View>
               <TouchableOpacity
                 style={{

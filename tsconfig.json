@@ -31,7 +31,7 @@
       "@util/*": ["./src/app/util/*"],
       "@assets/*": ["./src/assets/*"],
       "@store/*": ["./src/app/store/*"],
-      "@styled-components":["styled-components"]
+      "@styled-components/native":["styled-components/native"]
     }
   },
   "exclude": [

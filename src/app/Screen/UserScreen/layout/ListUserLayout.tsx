@@ -3,7 +3,7 @@ import { View, Text, FlatList, Platform, TextInput } from 'react-native'
 import GoBack from "@components/back";
 import axios from "axios";
 import { ApiURL } from "@network/api";
-import styled from 'styled-components'
+import styled from 'styled-components/native'
 import { replaceSpecialCharacter } from '@util/index'
 import { Sentry } from "@screen/GetsentryScreen/slice/initState";
 import { Icon_Image } from "@assets/image";

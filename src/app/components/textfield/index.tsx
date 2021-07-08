@@ -1,7 +1,7 @@
 import React from 'react'
 
 import { View, Text ,TextInput} from 'react-native'
-import styled from 'styled-components'
+import styled from 'styled-components/native'
 
 interface State {
     value?:any

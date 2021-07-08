@@ -13,7 +13,7 @@ import {useAppDispatch, useAppSelector} from '@app/store';
 import {TextField,GoBackLayout} from '@components';
 import {Formik} from 'formik';
 import * as Yup from 'yup';
-import styled from 'styled-components';
+import styled from 'styled-components/native';
 import {Icon_Image} from '@assets/image';
 import {requestProfileThunk} from '../slice/ProfileSlice';
 
