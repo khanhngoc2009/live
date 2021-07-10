@@ -12,7 +12,9 @@ import {
   ImageBackground,
   Image,
   Alert,
-  Dimensions
+  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView
 } from 'react-native';
 import RtcEngine, {
   RtcRemoteView,
@@ -36,6 +38,7 @@ import { ApiURL } from '@app/network/api';
 import styled from 'styled-components/native'
 import { Icon_Image } from '@assets/image';
 import { useDispatch } from 'react-redux'
+
 interface Props { }
 interface Message {
   url?: string,
@@ -57,25 +60,25 @@ interface State {
   role?: boolean;
   comment: string;
   timer: number;
-  message: Message[]
+  message: Message[];
+  keyboardStatus: any
 }
-const width = Dimensions.get('window').width;
-const Height = Dimensions.get('window').height;
-const message = [
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã sssssss " },
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-  { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-]
+// const width = Dimensions.get('window').width;
+// const Height = Dimensions.get('window').height;
+// const message = [
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã sssssss " },
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
+// ]
 class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, State> {
   _rtcEngine?: RtcEngine;
   _rtmEngine?: RtmEngine;
-
   constructor(props?: State & any) {
     super(props);
     this.state = {
@@ -87,13 +90,14 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
       inLobby: false,
       peerIds: [],
       seniors: [],
-      myUsername: '' + new Date().getTime(),
+      myUsername: 'toi la ' + new Date().getTime(),
       rooms: {},
       data: [],
       role: true,
       comment: "",
       timer: 0,
-      message: []
+      message: [],
+      keyboardStatus: undefined
     };
     if (Platform.OS === 'android') {
       requestCameraAndAudioPermission().then(() => {
@@ -115,14 +119,16 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    * @description hàm gửi message 
    */
   _onPressSend = async () => {
-    if (this.state.comment) {
+    const { comment, message } = this.state
+    if (comment) {
+      console.log(comment);
       const streamId = await this._rtcEngine?.createDataStreamWithConfig({});
-      await this._rtcEngine?.sendStreamMessage(streamId!, this.state.comment);
+      await this._rtcEngine?.sendStreamMessage(streamId!, comment);
       this.setState({
         message:
-          [...this.state.message, {
+          [...message, {
             name: "you",
-            message: this.state.comment
+            message: comment
           }],
         comment: ""
       }
@@ -136,9 +142,10 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    * @param status trạng thái của live stream
    * @description hàm xử lý update live
    */
-  _update = async (channelName, countMember: number, status: boolean) => {
+  _update = async (channelName, countMember: number, status: boolean, value?: any) => {
+
     let val = this.state.data.find((id) => id.channel === channelName)
-    let params = { ...val, users: countMember, status: status };
+    let params = { ...val, users: countMember, status: status, [value]: value };
     await axios.put(`${ApiURL.Live}/${val?.id}`, params).then((res) => {
       let resultData = this.state.data.map((val, ind) => {
         if (val.channel === channelName) {
@@ -157,19 +164,19 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     this.initRTM();
     this._request();
   }
+
   componentWillUnmount = async () => {
     await this._rtmEngine?.destroyClient();
     await this._rtcEngine?.destroy();
   }
+
   /**
    * @name initRTC
    * @description initRTC sử lý các sự kiện của rtc engine
    */
   initRTC = async () => {
-
     const { appId, role, inCall, inLobby } = this.state;
     console.log(inLobby, "init");
-
     this._rtcEngine = await RtcEngine.createWithConfig(
       new RtcEngineConfig(appId)
     )
@@ -177,6 +184,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     await this._rtcEngine.setChannelProfile(ChannelProfile.LiveBroadcasting)
     await this._rtcEngine.setDefaultAudioRoutetoSpeakerphone(true);
     await this._rtcEngine.setClientRole(!role ? ClientRole.Audience : ClientRole.Broadcaster)
+    await !role ? this._rtcEngine.disableAudio() : this._rtcEngine.enableAudio();
     this._addListener(this._rtcEngine);
   };
   /**
@@ -185,7 +193,9 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    * @description lắng nghe các sự kiện xảy ra
    */
   _addListener = (_rtcEngine) => {
-    const { appId, role, inCall, inLobby } = this.state;
+    const { appId, role, inCall, inLobby, myUsername } = this.state;
+    console.log(myUsername);
+
     _rtcEngine.addListener('Error', (err) => {
       console.log('Error', err);
     });
@@ -215,8 +225,8 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
         console.log('JoinChannelSuccess', channel, uid, elapsed);
         this.setState({
           inCall: true,
-        });
-        console.log(role);
+        },()=>console.log('--------Role----' + role));
+        
 
         let value = {
           uid: uid,
@@ -261,8 +271,8 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    * @name initRTM
    * @description Function to initialize the Rtm Engine, attach event listeners and use them to sync usernames
    */
+
   initRTM = async () => {
-    console.log(this.state.message);
     let { appId, myUsername } = this.state;
     this._rtmEngine = new RtmEngine();
     this._onRTM(this._rtmEngine);
@@ -331,7 +341,11 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    */
 
   joinCall = async (channelName: any, role: boolean) => {
-    this.setState({ channelName: channelName, role: role });
+    // console.log(channelName);
+    console.log(channelName+'role -----'+ this.state.role);
+    this.setState({ channelName: channelName, 
+      // role: role
+     });
     let { token } = this.state;
     await this._rtcEngine?.joinChannel(token, channelName, null, 0);
     await this._rtmEngine?.joinChannel(channelName)
@@ -347,6 +361,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     this.setState({
       inLobby: false,
       seniors: members.map((m: any) => m.uid),
+      // role: role
     });
   };
   endCall = async () => {
@@ -384,7 +399,9 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
   render() {
     const { inCall, channelName, inLobby, role } = this.state;
     return (
+
       <SafeAreaView style={styles.max}>
+
         {!inCall && <GoBackLayout title="Live Room"
           onClickIcon={() => {
             this.props.navigation.goBack();
@@ -405,37 +422,38 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     const { inLobby, rooms, input, data, comment } = this.state;
     return inLobby ? (
       <View style={styles.fullView}>
-        {data?.filter((e) => e.status).length != 0 &&
+        {Object.keys(rooms).length != 0 &&
           <>
             <TextTitleStatusRoom >Đang live stream</TextTitleStatusRoom>
             <ScrollView horizontal={true}>
-              {data?.filter((e) => e.status).map((value: Live, index) => {
-                return (
-                  <ButtonLiveRoom
-                    key={index}
-                    onPress={async () => {
-                      this.setState({ role: false })
-                      await this.joinCall(value.channel, false)
-                    }}>
-                    <ImageBackgroundButton source={Icon_Image.image_live_example} >
-                      <ViewLiveStatus>
-                        <ViewLeftBtnRender >
-                          <RedDot />
-                          <TextRedDot>Live</TextRedDot>
-                        </ViewLeftBtnRender>
-                        <View style={{ width: "50%" }}>
-                          <ViewRightBtnRender />
-                          <TextUserInLive>
-                            <IconEyeStyled source={Icon_Image.eye_ic} /> {value.users}</TextUserInLive>
-                        </View>
-                      </ViewLiveStatus>
-                    </ImageBackgroundButton>
-                  </ButtonLiveRoom>
-                );
+              {Object.keys(rooms).map((key, index) => {
+                if (rooms[key] != 0) {
+                  return (
+                    <ButtonLiveRoom
+                      key={index}
+                      onPress={ () => {
+                        this.setState({ role: false },()=>this.joinCall(input, false))
+                      }}>
+                      <ImageBackgroundButton source={Icon_Image.image_live_example} >
+                        <ViewLiveStatus>
+                          <ViewLeftBtnRender >
+                            <RedDot />
+                            <TextRedDot>Live</TextRedDot>
+                          </ViewLeftBtnRender>
+                          <View style={{ width: "50%" }}>
+                            <ViewRightBtnRender />
+                            <TextUserInLive>
+                              <IconEyeStyled source={Icon_Image.eye_ic} /> {rooms[key]}</TextUserInLive>
+                          </View>
+                        </ViewLiveStatus>
+                      </ImageBackgroundButton>
+                    </ButtonLiveRoom>
+                  );
+                }
               })}
-
             </ScrollView>
           </>}
+
         {data?.filter((e) => !e.status).length != 0 &&
           <>
             <TextTitleStatusRoom style={{ color: "gray" }}>Đã phát live</TextTitleStatusRoom>
@@ -444,9 +462,8 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
                 return (
                   <ButtonLiveRoom
                     key={index}
-                    onPress={async () => {
-                      this.setState({ role: false })
-                      await this.joinCall(value.channel, false)
+                    onPress={() => {
+                      this.setState({ role: false },()=>this.joinCall(input, false))
                     }}>
                     <ImageBackgroundButton source={Icon_Image.image_live_example}>
                       <ViewLiveStatus>
@@ -481,11 +498,11 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
         </ScrollView>}
         <View style={{ alignItems: "center" }}>
           <StartLiveButton
-            onPress={async () => {
+            onPress={ () => {
               let value = data?.filter((e) => e.channel === input)
               if (value?.length == 0) {
-                await this.setState({ role: true })
-                await this.joinCall(input, true)
+                //  this.setState({ role: true },()=>this.joinCall(input, true))
+                 
               } else {
                 Alert.alert("Message", "Error")
               }
@@ -501,7 +518,8 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    * @returns render ra màn hình call khi gọi tới
    */
   _renderCall = () => {
-    const { inCall, peerIds, channelName, data, comment, role } = this.state;
+    const { inCall, peerIds, channelName, data, comment, message, role } = this.state;
+    console.log(message);
     return inCall ? (
       <View style={{}}>
         {role ? <RtcLocalView.SurfaceView
@@ -523,79 +541,92 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
             })}
           </> : <Text >Đã tắt</Text>}
         </ScrollView>}
+
         {data?.filter((e) => e.channel === channelName && e.status).length != 0 && <ViewAbsoluteAllRender >
-          <ViewHeaderCallInfo>
-            <DirectionRow>
-              <ViewProfileHeaderLive>
-                <ImageProfileLive source={Icon_Image.image_boy_profile} />
-              </ViewProfileHeaderLive>
-              <View>
-                <TextChannelName>
-                  {"   " + channelName}
-                </TextChannelName>
-                <TextViewUserInLive>
-                  <IconEyeStyled source={Icon_Image.eye_ic} />  10</TextViewUserInLive>
-              </View>
-            </DirectionRow>
-            <TouchableOpacity onPress={async () => {
-              await this.endCall()
-            }}>
-              <IconClose source={Icon_Image.close_ic} />
-            </TouchableOpacity>
-          </ViewHeaderCallInfo>
 
-          <ViewFooter >
-            <ScrollViewMessage>
-              {message.map((v, ind) => {
-                return (
-                  <View key={ind} style={{ marginVertical: 5, flexDirection: "row", alignItems: "center" }}>
-                    <Image source={Icon_Image.image_boy_profile} style={{ height: 25, width: 25, borderRadius: 13 }} />
-                    <ViewInfoDetailMessage>
-                      <Text style={{ color: "white" }}>{v.Name}:{v.message}</Text>
-                    </ViewInfoDetailMessage>
+          <KeyboardAvoidingViewStyled
+            style={{ flex: 1 }}
+            enabled
+            behavior={(Platform.OS !== 'ios' && 'padding') || undefined}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 135 : 85}
+          >
+            {/* <ScrollView style={{  flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"> */}
+            <ViewKey>
+              <ViewHeaderCallInfo>
+                <DirectionRow>
+                  <ViewProfileHeaderLive>
+                    <ImageProfileLive source={Icon_Image.image_boy_profile} />
+                  </ViewProfileHeaderLive>
+                  <View>
+                    <TextChannelName>
+                      {"   " + channelName}
+                    </TextChannelName>
+                    <TextViewUserInLive>
+                      <IconEyeStyled source={Icon_Image.eye_ic} />  10</TextViewUserInLive>
                   </View>
-                )
-              })}
-            </ScrollViewMessage>
-            <ViewTabBarOption>
-              <ButtonOption
-                onPress={() => { }}>
-                <IconOption source={Icon_Image.shopping_bag} />
-              </ButtonOption>
-
-              <ViewCommentOption>
-                <TextInputComment
-                  value={comment}
-                  onChangeText={(t) => { this.setState({ comment: t }) }}
-                  placeholder="comment..."
-                  placeholderTextColor="white"
-                />
-                <TouchableOpacity
-                  onPress={async () => {
-                    comment ? await this._onPressSend() : null;
-                  }}
-                >
-                  <IconOption source={Icon_Image.send_ic} />
+                </DirectionRow>
+                <TouchableOpacity onPress={async () => {
+                  await this.endCall()
+                }}>
+                  <IconClose source={Icon_Image.close_ic} />
                 </TouchableOpacity>
-              </ViewCommentOption>
-              <ButtonOption
-                onPress={() => { }}>
-                <IconOption source={Icon_Image.share} />
-              </ButtonOption>
-              <ButtonOption
-                onPress={() => { }}>
-                <IconOption source={Icon_Image.heart_ic} />
-              </ButtonOption>
-            </ViewTabBarOption>
-            <View />
-          </ViewFooter>
+              </ViewHeaderCallInfo>
+
+              <ViewFooter >
+                <ScrollViewMessage>
+                  {message.map((v, ind) => {
+                    return (
+                      <View key={ind} style={{ marginVertical: 5, flexDirection: "row", alignItems: "center" }}>
+                        <Image source={Icon_Image.image_boy_profile} style={{ height: 25, width: 25, borderRadius: 13 }} />
+                        <ViewInfoDetailMessage>
+                          <Text style={{ color: "white" }}>{v.name}:{v.message}</Text>
+                        </ViewInfoDetailMessage>
+                      </View>
+                    )
+                  })}
+                </ScrollViewMessage>
+                <ViewTabBarOption>
+                  <ButtonOption
+                    onPress={() => { }}>
+                    <IconOption source={Icon_Image.shopping_bag} />
+                  </ButtonOption>
+                  <ViewCommentOption>
+                    <TextInputComment
+                      value={comment}
+                      onChangeText={(t) => { this.setState({ comment: t }) }}
+                      placeholder="comment..."
+                      placeholderTextColor="white"
+                    // onSubmitEditing={Keyboard.dismiss}
+                    />
+                    <TouchableOpacity
+                      onPress={async () => {
+                        comment ? await this._onPressSend() : null;
+                      }}
+                    >
+                      <IconOption source={Icon_Image.send_ic} />
+                    </TouchableOpacity>
+                  </ViewCommentOption>
+                  <ButtonOption
+                    onPress={() => { }}>
+                    <IconOption source={Icon_Image.share} />
+                  </ButtonOption>
+                  <ButtonOption
+                    onPress={() => { }}>
+                    <IconOption source={Icon_Image.heart_ic} />
+                  </ButtonOption>
+                </ViewTabBarOption>
+                <View />
+              </ViewFooter>
+            </ViewKey>
+            {/* </ScrollView> */}
+          </KeyboardAvoidingViewStyled>
         </ViewAbsoluteAllRender>}
       </View>
     ) : null;
   };
-
 }
-
 const mapStateToProps = (state: GenericListInitialState<Live>) => ({
   data: state.data
 });
@@ -605,13 +636,10 @@ const mapDispatchToProps = (dispatch) => ({
 })
 
 export default connect(mapStateToProps, mapDispatchToProps)(LiveRoomLayout);
-
-
 /**
  * @name styled  render list room
  * @description Viết các styled của _renderRoom ở đây
  */
-
 const TextTitleStatusRoom = styled.Text`
 fontSize: 16px;
 fontWeight: bold;
@@ -701,10 +729,20 @@ fontSize: 13px
  * @description Viết các styled của renderCall ở đây
  */
 
+const KeyboardAvoidingViewStyled = styled.KeyboardAvoidingView`
+flex:1
+
+`
 const ViewAbsoluteAllRender = styled.View`
 position: absolute
 justifyContent: space-between
-height: ${Dimensions.get('window').height}
+height: ${Dimensions.get('window').height - 80}
+paddingBottom: ${Platform.OS === "ios" ? 50 : 0}
+`
+const ViewKey = styled.View`
+flex:1
+justifyContent: space-between
+height: ${Dimensions.get('window').height - 80}
 paddingBottom: ${Platform.OS === "ios" ? 50 : 0}
 `
 const ViewHeaderCallInfo = styled.View`
@@ -730,7 +768,7 @@ justifyContent: center
 const ImageProfileLive = styled.Image`
 height: 30;
  width: 30;
-  borderRadius: 15;
+  borderRadius: 15px;
 `
 const TextChannelName = styled.Text`
 color: white;
