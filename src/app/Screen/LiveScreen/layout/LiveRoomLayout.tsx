@@ -110,6 +110,10 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
 
     })
   }
+  /**
+   * @name _onPressSend
+   * @description hàm gửi message 
+   */
   _onPressSend = async () => {
     if (this.state.comment) {
       const streamId = await this._rtcEngine?.createDataStreamWithConfig({});
@@ -125,6 +129,13 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
       )
     }
   };
+  /**
+   * @name _update
+   * @param channelName tên của channel đang hiện hữu
+   * @param countMember số người đang có trong live
+   * @param status trạng thái của live stream
+   * @description hàm xử lý update live
+   */
   _update = async (channelName, countMember: number, status: boolean) => {
     let val = this.state.data.find((id) => id.channel === channelName)
     let params = { ...val, users: countMember, status: status };
@@ -150,7 +161,10 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     await this._rtmEngine?.destroyClient();
     await this._rtcEngine?.destroy();
   }
-
+  /**
+   * @name initRTC
+   * @description initRTC sử lý các sự kiện của rtc engine
+   */
   initRTC = async () => {
 
     const { appId, role, inCall, inLobby } = this.state;
@@ -160,14 +174,22 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
       new RtcEngineConfig(appId)
     )
     await role ? this._rtcEngine.enableVideo() : this._rtcEngine.disableVideo();
-
-    this._rtcEngine.addListener('Error', (err) => {
-      console.log('Error', err);
-    });
     await this._rtcEngine.setChannelProfile(ChannelProfile.LiveBroadcasting)
     await this._rtcEngine.setDefaultAudioRoutetoSpeakerphone(true);
     await this._rtcEngine.setClientRole(!role ? ClientRole.Audience : ClientRole.Broadcaster)
-    this._rtcEngine.addListener('UserJoined', (uid) => {
+    this._addListener(this._rtcEngine);
+  };
+  /**
+   * @name _addListener
+   * @param _rtcEngine truyền vào giá trị rtcEngine
+   * @description lắng nghe các sự kiện xảy ra
+   */
+  _addListener = (_rtcEngine) => {
+    const { appId, role, inCall, inLobby } = this.state;
+    _rtcEngine.addListener('Error', (err) => {
+      console.log('Error', err);
+    });
+    _rtcEngine.addListener('UserJoined', (uid) => {
       const { peerIds, inCall, seniors, channelName } = this.state;
       if (peerIds.indexOf(uid) === -1) {
         if (inCall && seniors.length < 2) {
@@ -181,20 +203,21 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
         });
       }
     });
-    this._rtcEngine.addListener('UserOffline', (uid) => {
+    _rtcEngine.addListener('UserOffline', (uid) => {
       const { peerIds } = this.state;
       this.setState({
         peerIds: peerIds.filter((id) => id !== uid),
       });
     });
-    console.log(role);
-    this._rtcEngine.addListener(
+    _rtcEngine.addListener(
       'JoinChannelSuccess',
       (channel, uid, elapsed) => {
         console.log('JoinChannelSuccess', channel, uid, elapsed);
         this.setState({
           inCall: true,
         });
+        console.log(role);
+
         let value = {
           uid: uid,
           channel: channel,
@@ -232,7 +255,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
           missed,
           cached);
       });
-  };
+  }
 
   /**
    * @name initRTM
@@ -240,28 +263,35 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    */
   initRTM = async () => {
     console.log(this.state.message);
-
     let { appId, myUsername } = this.state;
     this._rtmEngine = new RtmEngine();
-
-    this._rtmEngine.on('error', (evt) => {
+    this._onRTM(this._rtmEngine);
+    await this._rtmEngine.createClient(appId).catch((e) => console.log(e));
+    await this._rtmEngine
+      ?.login({ uid: myUsername })
+      .catch((e) => console.log(e));
+    await this._rtmEngine?.joinChannel('lobby').catch((e) => console.log(e));
+    this.setState({ inLobby: true });
+  };
+  /**
+   * @name onRTM
+   * @description function con của init RTM
+   */
+  _onRTM = (_rtmEngine) => {
+    _rtmEngine.on('error', (evt) => {
       console.log(evt);
     });
-
-    this._rtmEngine.on('channelMessageReceived', (evt) => {
+    _rtmEngine.on('channelMessageReceived', (evt) => {
       let { text } = evt;
       let data = text.split(':');
       this.setState({ rooms: { ...this.state.rooms, [data[0]]: data[1] } });
     });
-
-    this._rtmEngine.on('messageReceived', (evt) => {
+    _rtmEngine.on('messageReceived', (evt) => {
       let { text } = evt;
       let data = text.split(':');
       this.setState({ rooms: { ...this.state.rooms, [data[0]]: data[1] } });
     });
-
-
-    this._rtmEngine.on('channelMemberJoined', (evt) => {
+    _rtmEngine.on('channelMemberJoined', (evt) => {
       let { channelName, seniors, peerIds, inCall } = this.state;
       let { channelId, uid } = evt;
       if (inCall && channelId === 'lobby' && seniors.length < 2) {
@@ -270,14 +300,11 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
             peerId: uid,
             text: channelName + ':' + (peerIds.length + 1),
             offline: false,
-          })
-          .catch((e) => console.log(e));
+          }).catch((e) => console.log(e));
         this._update(channelName, peerIds.length + 1, true)
       }
-
     });
-
-    this._rtmEngine.on('channelMemberLeft', (evt) => {
+    _rtmEngine.on('channelMemberLeft', (evt) => {
       let { channelId, uid } = evt;
       let { channelName, seniors, inCall, peerIds, rooms } = this.state;
       if (channelName === channelId) {
@@ -296,23 +323,15 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
         }
       }
     });
-
-    await this._rtmEngine.createClient(appId).catch((e) => console.log(e));
-    await this._rtmEngine
-      ?.login({ uid: myUsername })
-      .catch((e) => console.log(e));
-
-    await this._rtmEngine?.joinChannel('lobby').catch((e) => console.log(e));
-
-    this.setState({ inLobby: true });
-  };
+  }
 
   /**
    * @name joinCall
    * @description Function to join a room and start the call
    */
-  joinCall = async (channelName: any) => {
-    this.setState({ channelName });
+
+  joinCall = async (channelName: any, role: boolean) => {
+    this.setState({ channelName: channelName, role: role });
     let { token } = this.state;
     await this._rtcEngine?.joinChannel(token, channelName, null, 0);
     await this._rtmEngine?.joinChannel(channelName)
@@ -343,15 +362,11 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     await this._rtmEngine?.login({ uid: myUsername });
     await this._rtmEngine?.joinChannel('lobby');
 
+    /**
+     * @name update live về trạng thái đã live và record
+     */
     if (role) {
       this._update(channelName, 0, false)
-      // let val = data.find((e) => e.channel === channelName)
-      // await axios.delete(`${ApiURL.Live}/${val?.id}`).then((res) => {
-      //   this.setState({ data: data.filter((id) => id.id !== res.data.id) })
-      //   console.log(res.data);
-      // }).catch((e) => {
-      //   console.log(e);
-      // })
     }
 
     this.setState({
@@ -363,7 +378,9 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
       role: false
     });
   };
-
+  /**
+   * @returns all render cần thiết
+   */
   render() {
     const { inCall, channelName, inLobby, role } = this.state;
     return (
@@ -380,57 +397,40 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
       </SafeAreaView>
     );
   }
-
+  /**
+   * 
+   * @returns render ra danh sách live đang 
+   */
   _renderRooms = () => {
     const { inLobby, rooms, input, data, comment } = this.state;
     return inLobby ? (
       <View style={styles.fullView}>
         {data?.filter((e) => e.status).length != 0 &&
           <>
-            <Text style={{ fontSize: 16, fontWeight: "bold", color: "red", marginVertical: 20 }}>Đang live stream</Text>
+            <TextTitleStatusRoom >Đang live stream</TextTitleStatusRoom>
             <ScrollView horizontal={true}>
               {data?.filter((e) => e.status).map((value: Live, index) => {
                 return (
-                  <TouchableOpacity
+                  <ButtonLiveRoom
                     key={index}
                     onPress={async () => {
                       this.setState({ role: false })
-                      await this.joinCall(value.channel)
-                    }}
-                    style={{
-                      width: 180,
-                      height: 180,
-                      backgroundColor: "white",
-                      padding: 5
+                      await this.joinCall(value.channel, false)
                     }}>
-                    <ImageBackground source={Icon_Image.image_live_example} style={{ width: "100%", height: "100%" }} >
-                      <View style={{
-                        height: 25,
-                        width: "60%",
-                        alignItems: "center",
-                        flexDirection: "row",
-                        margin: 10
-                      }}>
+                    <ImageBackgroundButton source={Icon_Image.image_live_example} >
+                      <ViewLiveStatus>
                         <ViewLeftBtnRender >
-                          <View style={{ width: 5, height: 5, backgroundColor: "white", borderRadius: 3 }} />
-                          <Text style={{ color: "white", fontWeight: "bold", marginLeft: 5, fontSize: 12 }}>Live</Text>
+                          <RedDot />
+                          <TextRedDot>Live</TextRedDot>
                         </ViewLeftBtnRender>
                         <View style={{ width: "50%" }}>
                           <ViewRightBtnRender />
-                          <Text style={{
-                            color: "white",
-                            marginLeft: 5,
-                            fontSize: 12,
-                            position: "absolute",
-                            marginVertical: 5,
-                            marginHorizontal: 5
-                          }}>
-                            <Image source={Icon_Image.eye_ic}
-                              style={{ width: 10, height: 10 }} /> {value.users}</Text>
+                          <TextUserInLive>
+                            <IconEyeStyled source={Icon_Image.eye_ic} /> {value.users}</TextUserInLive>
                         </View>
-                      </View>
-                    </ImageBackground>
-                  </TouchableOpacity>
+                      </ViewLiveStatus>
+                    </ImageBackgroundButton>
+                  </ButtonLiveRoom>
                 );
               })}
 
@@ -438,50 +438,31 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
           </>}
         {data?.filter((e) => !e.status).length != 0 &&
           <>
-            <Text style={{ fontSize: 16, fontWeight: "bold", color: "gray", marginVertical: 20 }}>Đã phát live</Text>
+            <TextTitleStatusRoom style={{ color: "gray" }}>Đã phát live</TextTitleStatusRoom>
             <ScrollView horizontal={true}>
               {data?.filter((e) => !e.status).map((value: Live, index) => {
                 return (
-                  <TouchableOpacity
+                  <ButtonLiveRoom
                     key={index}
                     onPress={async () => {
                       this.setState({ role: false })
-                      await this.joinCall(value.channel)
-                    }}
-                    style={{
-                      width: 180,
-                      height: 180,
-                      backgroundColor: "white",
-                      padding: 5
+                      await this.joinCall(value.channel, false)
                     }}>
-                    <ImageBackground source={Icon_Image.image_live_example} style={{ width: "100%", height: "100%" }} >
-                      <View style={{
-                        height: 25,
-                        width: "60%",
-                        alignItems: "center",
-                        flexDirection: "row",
-                        margin: 10
-                      }}>
+                    <ImageBackgroundButton source={Icon_Image.image_live_example}>
+                      <ViewLiveStatus>
                         <ViewLeftBtnRender style={{ backgroundColor: "gray" }}>
-                          <View style={{ width: 5, height: 5, backgroundColor: "white", borderRadius: 3 }} />
-                          <Text style={{ color: "white", fontWeight: "bold", marginLeft: 5, fontSize: 12 }}>Lived</Text>
+                          <RedDot style={{ backgroundColor: "white" }} />
+                          <TextRedDot style={{ color: "white" }}>Lived</TextRedDot>
                         </ViewLeftBtnRender>
                         <View style={{ width: "50%" }}>
                           <ViewRightBtnRender />
-                          <Text style={{
-                            color: "white",
-                            marginLeft: 5,
-                            fontSize: 12,
-                            position: "absolute",
-                            marginVertical: 5,
-                            marginHorizontal: 5
-                          }}>
-                            <Image source={Icon_Image.eye_ic}
-                              style={{ width: 10, height: 10 }} /> {value.users}</Text>
+                          <TextUserInLive>
+                            <IconEyeStyled source={Icon_Image.eye_ic}
+                            /> {value.users}</TextUserInLive>
                         </View>
-                      </View>
-                    </ImageBackground>
-                  </TouchableOpacity>
+                      </ViewLiveStatus>
+                    </ImageBackgroundButton>
+                  </ButtonLiveRoom>
                 );
               })}
               <Text>
@@ -499,34 +480,26 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
           </Text>
         </ScrollView>}
         <View style={{ alignItems: "center" }}>
-          <TouchableOpacity
+          <StartLiveButton
             onPress={async () => {
               let value = data?.filter((e) => e.channel === input)
               if (value?.length == 0) {
                 await this.setState({ role: true })
-                await this.joinCall(input)
+                await this.joinCall(input, true)
               } else {
                 Alert.alert("Message", "Error")
               }
-            }}
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              backgroundColor: 'red',
-              marginBottom: 16,
-              borderRadius: 30,
-              width: 60,
-              height: 60,
-              justifyContent: "center",
-              alignItems: "center"
             }}>
-            <Text style={{ color: "white", fontWeight: "bold", fontSize: 13 }}>Live</Text>
-          </TouchableOpacity>
+            <TextStartLiveButton >Live</TextStartLiveButton>
+          </StartLiveButton>
         </View>
       </View>
     ) : null;
   };
-
+  /**
+   * @name renderCall 
+   * @returns render ra màn hình call khi gọi tới
+   */
   _renderCall = () => {
     const { inCall, peerIds, channelName, data, comment, role } = this.state;
     return inCall ? (
@@ -543,171 +516,84 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
                   channelId={channelName}
                   renderMode={VideoRenderMode.Hidden}
                   key={index}
-                  uid={val.uid}
+                  uid={Number(val.uid)}
                   style={styles.video}
                 />
               );
             })}
           </> : <Text >Đã tắt</Text>}
         </ScrollView>}
-        {data?.filter((e) => e.channel === channelName).length != 0 && <View style={{
-          position: "absolute",
-          justifyContent: "space-between",
-          height: Height - 80,
-          paddingBottom: Platform.OS === "ios" ? 50 : 0,
-        }}>
-          <View style={{
-            paddingVertical: 10,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            paddingHorizontal: 10,
-            alignItems: "center",
-            width: width,
-            height: 50,
-          }}>
-            <View style={{ flexDirection: "row" }}>
-              <View style={{
-                height: 32,
-                width: 32,
-                borderRadius: 16,
-                backgroundColor: "white",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-              >
-                <Image source={Icon_Image.image_boy_profile} style={{ height: 30, width: 30, borderRadius: 15 }} />
-              </View>
+        {data?.filter((e) => e.channel === channelName && e.status).length != 0 && <ViewAbsoluteAllRender >
+          <ViewHeaderCallInfo>
+            <DirectionRow>
+              <ViewProfileHeaderLive>
+                <ImageProfileLive source={Icon_Image.image_boy_profile} />
+              </ViewProfileHeaderLive>
               <View>
-                <Text style={{ color: "white", fontWeight: "bold" }}>
+                <TextChannelName>
                   {"   " + channelName}
-                </Text>
-                <Text style={{
-                  color: "white",
-                  marginLeft: 10,
-                  fontSize: 12,
-                }}>
-                  <Image source={Icon_Image.eye_ic}
-                    style={{ width: 10, height: 10 }} />  10</Text>
+                </TextChannelName>
+                <TextViewUserInLive>
+                  <IconEyeStyled source={Icon_Image.eye_ic} />  10</TextViewUserInLive>
               </View>
-            </View>
+            </DirectionRow>
             <TouchableOpacity onPress={async () => {
-
               await this.endCall()
-            }} style={{
-              // margin:10
             }}>
-              <Image source={Icon_Image.close_ic} style={{ height: 20, width: 20, borderRadius: 15 }} />
+              <IconClose source={Icon_Image.close_ic} />
             </TouchableOpacity>
-          </View>
-          <View style={{
-            width: "100%",
-            justifyContent: "space-between",
-          }}>
-            <ScrollView
-              style={{
-                paddingHorizontal: 20,
-                marginVertical: 15,
-                width: "70%",
-                height: 250,
-              }}>
+          </ViewHeaderCallInfo>
+
+          <ViewFooter >
+            <ScrollViewMessage>
               {message.map((v, ind) => {
                 return (
                   <View key={ind} style={{ marginVertical: 5, flexDirection: "row", alignItems: "center" }}>
                     <Image source={Icon_Image.image_boy_profile} style={{ height: 25, width: 25, borderRadius: 13 }} />
-                    <View style={{
-                      backgroundColor: 'rgba(52, 52, 52, 0.5)',
-                      borderRadius: 15,
-                      marginLeft: 10,
-                      justifyContent: "center",
-                      paddingHorizontal: 15,
-                      paddingVertical: 10
-                    }}>
+                    <ViewInfoDetailMessage>
                       <Text style={{ color: "white" }}>{v.Name}:{v.message}</Text>
-                    </View>
+                    </ViewInfoDetailMessage>
                   </View>
                 )
               })}
-            </ScrollView>
-            <View style={{
-              height: 40,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-around",
-            }}>
-              <TouchableOpacity
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 25,
-                  backgroundColor: 'rgba(52, 52, 52, 0.5)',
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
+            </ScrollViewMessage>
+            <ViewTabBarOption>
+              <ButtonOption
                 onPress={() => { }}>
-                <Image source={Icon_Image.shopping_bag} style={{ width: 20, height: 20 }} />
-              </TouchableOpacity>
-              <View style={{
-                width: "50%",
-                height: 40,
-                borderRadius: 25,
-                backgroundColor: 'rgba(52, 52, 52, 0.6)',
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-around"
-              }}>
-                <TextInput
+                <IconOption source={Icon_Image.shopping_bag} />
+              </ButtonOption>
+
+              <ViewCommentOption>
+                <TextInputComment
                   value={comment}
                   onChangeText={(t) => { this.setState({ comment: t }) }}
                   placeholder="comment..."
                   placeholderTextColor="white"
-                  style={{
-                    width: "75%",
-                    height: 40,
-                    borderRadius: 25,
-                    color: "white",
-                    padding: 5,
-                  }}
                 />
                 <TouchableOpacity
                   onPress={async () => {
                     comment ? await this._onPressSend() : null;
                   }}
                 >
-                  <Image source={Icon_Image.send_ic} style={{ width: 20, height: 20 }} />
+                  <IconOption source={Icon_Image.send_ic} />
                 </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 25,
-                  backgroundColor: 'rgba(52, 52, 52, 0.5)',
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
+              </ViewCommentOption>
+              <ButtonOption
                 onPress={() => { }}>
-                <Image source={Icon_Image.share} style={{ width: 20, height: 20 }} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 25,
-                  backgroundColor: 'rgba(52, 52, 52, 0.5)',
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
+                <IconOption source={Icon_Image.share} />
+              </ButtonOption>
+              <ButtonOption
                 onPress={() => { }}>
-                <Image source={Icon_Image.heart_ic} style={{ width: 25, height: 25, borderRadius: 13 }} />
-              </TouchableOpacity>
-            </View>
+                <IconOption source={Icon_Image.heart_ic} />
+              </ButtonOption>
+            </ViewTabBarOption>
             <View />
-          </View>
-        </View>}
+          </ViewFooter>
+        </ViewAbsoluteAllRender>}
       </View>
     ) : null;
-
   };
+
 }
 
 const mapStateToProps = (state: GenericListInitialState<Live>) => ({
@@ -719,24 +605,198 @@ const mapDispatchToProps = (dispatch) => ({
 })
 
 export default connect(mapStateToProps, mapDispatchToProps)(LiveRoomLayout);
+
+
+/**
+ * @name styled  render list room
+ * @description Viết các styled của _renderRoom ở đây
+ */
+
+const TextTitleStatusRoom = styled.Text`
+fontSize: 16px;
+fontWeight: bold;
+color: red;
+marginVertical: 20px;
+`
+const ButtonLiveRoom = styled.TouchableOpacity`
+width: 180px
+height: 180px
+backgroundColor: white
+padding: 5px
+`
+const ImageBackgroundButton = styled.ImageBackground`
+ width: 100% ;
+ height: 100% ;
+ `
 const ViewLeftBtnRender = styled.View`
-width: 50%
-height: 25px
-justifyContent: center
-alignItems: center
-flexDirection: row
-backgroundColor: red
-borderBottomLeftRadius: 10px
-borderTopLeftRadius: 10px
-`
+ width: 50%
+ height: 25px
+ justifyContent: center
+ alignItems: center
+ flexDirection: row
+ backgroundColor: red
+ borderBottomLeftRadius: 10px
+ borderTopLeftRadius: 10px
+ `
 const ViewRightBtnRender = styled.View`
-width: 100%
+ width: 100%
+ height: 25px
+ justifyContent: center
+ alignItems: center
+ flexDirection: row
+ backgroundColor: black
+ borderBottomRightRadius: 10px
+ borderTopRightRadius: 10px
+ opacity: 0.2
+ `
+const ViewLiveStatus = styled.View`
 height: 25px
-justifyContent: center
+width: 60%
 alignItems: center
 flexDirection: row
-backgroundColor: black
-borderBottomRightRadius: 10px
-borderTopRightRadius: 10px
-opacity: 0.2
+margin: 10px
 `
+const RedDot = styled.View`
+width: 5px
+height: 5px;
+backgroundColor: white;
+borderRadius: 3px
+`
+const TextRedDot = styled.Text`
+color: white
+fontWeight: bold;
+marginLeft: 5px
+ fontSize: 12px
+`
+const TextUserInLive = styled.Text`
+color: white
+marginLeft: 5px
+fontSize: 12px
+position: absolute
+marginVertical: 5px
+marginHorizontal: 5px
+`
+const IconEyeStyled = styled.Image`
+width: 10px;
+height: 10px
+`
+const StartLiveButton = styled.TouchableOpacity`
+paddingHorizontal: 16px;
+paddingVertical: 8px;
+backgroundColor: red;
+marginBottom: 16px;
+borderRadius: 30px;
+width: 60px;
+height: 60px;
+justifyContent: center
+alignItems: center
+`
+const TextStartLiveButton = styled.Text`
+color: white
+fontWeight: bold;
+fontSize: 13px
+`
+/**
+ * @name styled renderCall
+ * @description Viết các styled của renderCall ở đây
+ */
+
+const ViewAbsoluteAllRender = styled.View`
+position: absolute
+justifyContent: space-between
+height: ${Dimensions.get('window').height}
+paddingBottom: ${Platform.OS === "ios" ? 50 : 0}
+`
+const ViewHeaderCallInfo = styled.View`
+paddingVertical: 10px
+flexDirection: row
+justifyContent: space-between
+paddingHorizontal: 10px
+alignItems: center
+width: ${Dimensions.get('window').width}
+height: 50
+`
+const DirectionRow = styled.View`
+flexDirection: row
+`
+const ViewProfileHeaderLive = styled.View`
+height: 32px
+width: 32px
+borderRadius: 16px
+backgroundColor: white
+alignItems: center
+justifyContent: center
+`
+const ImageProfileLive = styled.Image`
+height: 30;
+ width: 30;
+  borderRadius: 15;
+`
+const TextChannelName = styled.Text`
+color: white;
+ fontWeight: bold;
+`
+const TextViewUserInLive = styled.Text`
+color: white
+marginLeft: 10px
+fontSize: 12px
+`
+const IconClose = styled.Image`
+height: 20px;
+ width: 20px;
+  borderRadius: 15px
+`
+const ViewFooter = styled.View`
+width: 100%
+justifyContent: space-between
+`
+const ScrollViewMessage = styled.ScrollView`
+paddingHorizontal: 20px
+marginVertical: 15px
+width: 70%
+height: 250px
+`
+const ViewInfoDetailMessage = styled.View`
+backgroundColor: rgba(52, 52, 52, 0.5)
+borderRadius: 15px
+marginLeft: 10px
+justifyContent: center
+paddingHorizontal: 15px
+paddingVertical: 10px
+`
+const ViewTabBarOption = styled.View`
+height: 40px;
+flexDirection: row;
+alignItems: center;
+justifyContent: space-around;
+`
+const ButtonOption = styled.TouchableOpacity`
+width: 40px
+height: 40px
+borderRadius: 25px
+backgroundColor: rgba(52, 52, 52, 0.5)
+justifyContent: center;
+alignItems: center;
+`
+const IconOption = styled.Image`
+width: 20px;
+ height: 20px
+`
+const ViewCommentOption = styled.View`
+width: 50%
+height: 40px
+borderRadius: 25px
+backgroundColor: rgba(52, 52, 52, 0.6)
+flexDirection: row
+alignItems: center
+justifyContent: space-around
+`
+const TextInputComment = styled.TextInput`
+width: 75%
+height: 40px
+borderRadius: 25px
+color: white
+padding: 5px
+`
+
+
