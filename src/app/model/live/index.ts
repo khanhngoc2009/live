@@ -3,10 +3,11 @@ import { Message } from "../message";
 
 export interface Live {
     id?:string,
-    uid?:string,
+    uid?:number,
     channel?:string,
-    token?:string,
+    token?:any,
     users?:number,
     appId?:string,
     messages?:Message[]
+    status?:boolean
 }
