@@ -5,7 +5,7 @@ import { RouterName } from './router_name';
 import { HomePageLayout } from '@screen/HomeScreen'
 import { ProfileLayout, SettingScreen } from '@screen/SettingScreen'
 import { useAppSelector } from '../store';
-import { LiveScreenLayout as LiveScreen, LiveRoomLayout as LiveRoomScreen, LiveSendMessage } from '@screen/LiveScreen';
+import { LiveScreenLayout as LiveScreen, LiveRoomLayout as LiveRoomScreen, LiveSendMessage, StartLiveLayout } from '@screen/LiveScreen';
 import ListGensentry from '@screen/GetsentryScreen/layout/ListSentry';
 import { ListUserLayout } from '@screen/UserScreen'
 import SentryDetailScreen from '@screen/GetsentryScreen/layout/SentryDetailScreen'
@@ -31,6 +31,7 @@ const NavigationHome = () => {
           <Stack.Screen name={RouterName.CreateUserScreen} component={CreateUserScreen} />
           <Stack.Screen name={RouterName.SettingScreen} component={SettingScreen} />
           <Stack.Screen name={RouterName.NotificationScreen} component={NotificationScreen} />
+          <Stack.Screen name={RouterName.StartLiveScreen} component={StartLiveLayout} />
         </Stack.Navigator>
     </>
   );

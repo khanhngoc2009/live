@@ -17,7 +17,7 @@ const HomePageLayout = ({ navigation }) => {
                         flexDirection: "row",
                         justifyContent: "center",
                         alignItems: "center"
-                    }} onPress={() => { navigation.navigate(RouterName.LiveScreen) }}>
+                    }} onPress={() => { navigation.navigate(RouterName.StartLiveScreen) }}>
                         <ImageStyled
                             source={Icon_Image.live_Image_home_screen}
                             style={{
@@ -57,7 +57,7 @@ const HomePageLayout = ({ navigation }) => {
                             </View>
                         </ButtonLiveStream>
                         <View style={{width:"45%"}}>
-                            <ButtonLiveStream style={{ width: "100%", height: 200 }} onPress={() => { navigation.navigate(RouterName.LiveSendMessage) }}>
+                            <ButtonLiveStream style={{ width: "100%", height: 200 }} onPress={() => { navigation.navigate(RouterName.LiveScreen) }}>
                                 <ImageStyled
                                     source={Icon_Image.send_live_home_screen}
                                     style={{width: "100%",height: 130}}

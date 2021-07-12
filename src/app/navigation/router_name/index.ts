@@ -11,5 +11,6 @@ export const RouterName={
     SentryDetailScreen:"SentryDetailScreen",
     CreateUserScreen:"CreateUserScreen",
     SettingScreen:"SettingScreen",
-    NotificationScreen:"NotificationScreen"
+    NotificationScreen:"NotificationScreen",
+    StartLiveScreen:"StartLiveScreen"
 }

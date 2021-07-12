@@ -63,19 +63,6 @@ interface State {
   message: Message[];
   keyboardStatus: any
 }
-// const width = Dimensions.get('window').width;
-// const Height = Dimensions.get('window').height;
-// const message = [
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã sssssss " },
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-//   { background: Icon_Image.profile, Name: "Huyền", message: "đã" },
-// ]
 class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, State> {
   _rtcEngine?: RtcEngine;
   _rtmEngine?: RtmEngine;
@@ -86,7 +73,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
       token: null,
       channelName: "",
       inCall: false,
-      input: 'live stream ' + new Date().getTime(),
+      input: 'live stream',
       inLobby: false,
       peerIds: [],
       seniors: [],
@@ -175,16 +162,16 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    * @description initRTC sử lý các sự kiện của rtc engine
    */
   initRTC = async () => {
-    const { appId, role, inCall, inLobby } = this.state;
-    console.log(inLobby, "init");
+    const { appId, inLobby } = this.state;
+
     this._rtcEngine = await RtcEngine.createWithConfig(
       new RtcEngineConfig(appId)
     )
-    await role ? this._rtcEngine.enableVideo() : this._rtcEngine.disableVideo();
+    await this._rtcEngine.enableVideo();
     await this._rtcEngine.setChannelProfile(ChannelProfile.LiveBroadcasting)
     await this._rtcEngine.setDefaultAudioRoutetoSpeakerphone(true);
-    await this._rtcEngine.setClientRole(!role ? ClientRole.Audience : ClientRole.Broadcaster)
-    await !role ? this._rtcEngine.disableAudio() : this._rtcEngine.enableAudio();
+    await this._rtcEngine.setClientRole(ClientRole.Audience)
+    await this._rtcEngine.enableAudio();
     this._addListener(this._rtcEngine);
   };
   /**
@@ -193,9 +180,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    * @description lắng nghe các sự kiện xảy ra
    */
   _addListener = (_rtcEngine) => {
-    const { appId, role, inCall, inLobby, myUsername } = this.state;
-    console.log(myUsername);
-
+    const { appId, myUsername } = this.state;
     _rtcEngine.addListener('Error', (err) => {
       console.log('Error', err);
     });
@@ -225,24 +210,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
         console.log('JoinChannelSuccess', channel, uid, elapsed);
         this.setState({
           inCall: true,
-        },()=>console.log('--------Role----' + role));
-        
-
-        let value = {
-          uid: uid,
-          channel: channel,
-          token: this.state.token,
-          users: 0,
-          appId: appId,
-          messages: [],
-          status: true
-        };
-        axios.post(ApiURL.Live, value).then((res) => {
-          this.setState({
-            data: [...this.state.data, res.data]
-          })
-        }).catch((e) => {
-        })
+        });
       },
     );
     this._rtcEngine?.addListener('StreamMessage', (uid, streamId, data) => {
@@ -311,7 +279,6 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
             text: channelName + ':' + (peerIds.length + 1),
             offline: false,
           }).catch((e) => console.log(e));
-        this._update(channelName, peerIds.length + 1, true)
       }
     });
     _rtmEngine.on('channelMemberLeft', (evt) => {
@@ -341,11 +308,11 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    */
 
   joinCall = async (channelName: any, role: boolean) => {
-    // console.log(channelName);
-    console.log(channelName+'role -----'+ this.state.role);
-    this.setState({ channelName: channelName, 
+    this.setState({
+      channelName: channelName,
       // role: role
-     });
+    });
+
     let { token } = this.state;
     await this._rtcEngine?.joinChannel(token, channelName, null, 0);
     await this._rtmEngine?.joinChannel(channelName)
@@ -365,7 +332,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     });
   };
   endCall = async () => {
-    let { channelName, myUsername, peerIds, seniors, role, data } = this.state;
+    let { channelName, myUsername, peerIds, seniors } = this.state;
     if (seniors.length < 2) {
       await this._rtmEngine
         ?.sendMessageByChannelId('lobby', channelName + ':' + peerIds.length)
@@ -376,23 +343,27 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     await this._rtmEngine?.logout();
     await this._rtmEngine?.login({ uid: myUsername });
     await this._rtmEngine?.joinChannel('lobby');
-
-    /**
-     * @name update live về trạng thái đã live và record
-     */
-    if (role) {
-      this._update(channelName, 0, false)
-    }
-
     this.setState({
       peerIds: [],
       inCall: false,
       inLobby: true,
       seniors: [],
       channelName: '',
-      role: false
+      role: false,
+      
     });
   };
+  _renderEndCall = () => {
+    setTimeout(() => {
+      if (this.state.peerIds
+        ?.length === 0) {
+        this.endCall()
+      }
+    }, 1500)
+    return (
+      <TextTurnOffLive>Live đã tắt</TextTurnOffLive>
+    )
+  }
   /**
    * @returns all render cần thiết
    */
@@ -431,8 +402,8 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
                   return (
                     <ButtonLiveRoom
                       key={index}
-                      onPress={ () => {
-                        this.setState({ role: false },()=>this.joinCall(input, false))
+                      onPress={() => {
+                        this.setState({ role: false }, () => this.joinCall(key, false))
                       }}>
                       <ImageBackgroundButton source={Icon_Image.image_live_example} >
                         <ViewLiveStatus>
@@ -453,63 +424,13 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
               })}
             </ScrollView>
           </>}
-
-        {data?.filter((e) => !e.status).length != 0 &&
-          <>
-            <TextTitleStatusRoom style={{ color: "gray" }}>Đã phát live</TextTitleStatusRoom>
-            <ScrollView horizontal={true}>
-              {data?.filter((e) => !e.status).map((value: Live, index) => {
-                return (
-                  <ButtonLiveRoom
-                    key={index}
-                    onPress={() => {
-                      this.setState({ role: false },()=>this.joinCall(input, false))
-                    }}>
-                    <ImageBackgroundButton source={Icon_Image.image_live_example}>
-                      <ViewLiveStatus>
-                        <ViewLeftBtnRender style={{ backgroundColor: "gray" }}>
-                          <RedDot style={{ backgroundColor: "white" }} />
-                          <TextRedDot style={{ color: "white" }}>Lived</TextRedDot>
-                        </ViewLeftBtnRender>
-                        <View style={{ width: "50%" }}>
-                          <ViewRightBtnRender />
-                          <TextUserInLive>
-                            <IconEyeStyled source={Icon_Image.eye_ic}
-                            /> {value.users}</TextUserInLive>
-                        </View>
-                      </ViewLiveStatus>
-                    </ImageBackgroundButton>
-                  </ButtonLiveRoom>
-                );
-              })}
-              <Text>
-                {data?.length === 0
-                  ? 'No active rooms, please create new room'
-                  : null}
-              </Text>
-            </ScrollView>
-          </>}
-        {data?.length === 0 && <ScrollView horizontal={true}>
+        {Object.keys(rooms)?.length === 0 && <ScrollView horizontal={true}>
           <Text>
-            {data?.length === 0
+            {Object.keys(rooms)?.length === 0
               ? 'No active rooms, please create new room'
               : null}
           </Text>
         </ScrollView>}
-        <View style={{ alignItems: "center" }}>
-          <StartLiveButton
-            onPress={ () => {
-              let value = data?.filter((e) => e.channel === input)
-              if (value?.length == 0) {
-                //  this.setState({ role: true },()=>this.joinCall(input, true))
-                 
-              } else {
-                Alert.alert("Message", "Error")
-              }
-            }}>
-            <TextStartLiveButton >Live</TextStartLiveButton>
-          </StartLiveButton>
-        </View>
       </View>
     ) : null;
   };
@@ -518,111 +439,103 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    * @returns render ra màn hình call khi gọi tới
    */
   _renderCall = () => {
-    const { inCall, peerIds, channelName, data, comment, message, role } = this.state;
-    console.log(message);
+    const { inCall, peerIds, channelName, data, comment, message } = this.state;
+    console.log(peerIds);
+
     return inCall ? (
       <View style={{}}>
-        {role ? <RtcLocalView.SurfaceView
-          style={styles.video}
-          channelId={channelName}
-          renderMode={VideoRenderMode.Hidden}
-        /> : <ScrollView>
-          {data?.filter((e) => e.channel === channelName).length != 0 ? <>
-            {data?.filter((e) => e.channel === channelName).map((val, index) => {
+        {peerIds?.length != 0 ? <>
+          <ScrollView>
+            {peerIds.map((key, index) => {
               return (
                 <RtcRemoteView.SurfaceView
                   channelId={channelName}
                   renderMode={VideoRenderMode.Hidden}
                   key={index}
-                  uid={Number(val.uid)}
+                  uid={key}
                   style={styles.video}
                 />
               );
             })}
-          </> : <Text >Đã tắt</Text>}
-        </ScrollView>}
+          </ScrollView>
+          <ViewAbsoluteAllRender >
+            <KeyboardAvoidingViewStyled
+              style={{ flex: 1 }}
+              enabled
+              behavior={(Platform.OS !== 'ios' && 'padding') || undefined}
+              keyboardVerticalOffset={Platform.OS === "ios" ? 135 : 85}
+            >
+              <ViewKey>
+                <ViewHeaderCallInfo>
+                  <DirectionRow>
+                    <ViewProfileHeaderLive>
+                      <ImageProfileLive source={Icon_Image.image_boy_profile} />
+                    </ViewProfileHeaderLive>
+                    <View>
+                      <TextChannelName>
+                        {"   " + channelName}
+                      </TextChannelName>
+                      <TextViewUserInLive>
+                        <IconEyeStyled source={Icon_Image.eye_ic} />  10</TextViewUserInLive>
+                    </View>
+                  </DirectionRow>
+                  <TouchableOpacity onPress={async () => {
+                    await this.endCall()
+                  }}>
+                    <IconClose source={Icon_Image.close_ic} />
+                  </TouchableOpacity>
+                </ViewHeaderCallInfo>
 
-        {data?.filter((e) => e.channel === channelName && e.status).length != 0 && <ViewAbsoluteAllRender >
-
-          <KeyboardAvoidingViewStyled
-            style={{ flex: 1 }}
-            enabled
-            behavior={(Platform.OS !== 'ios' && 'padding') || undefined}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 135 : 85}
-          >
-            {/* <ScrollView style={{  flex: 1 }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"> */}
-            <ViewKey>
-              <ViewHeaderCallInfo>
-                <DirectionRow>
-                  <ViewProfileHeaderLive>
-                    <ImageProfileLive source={Icon_Image.image_boy_profile} />
-                  </ViewProfileHeaderLive>
-                  <View>
-                    <TextChannelName>
-                      {"   " + channelName}
-                    </TextChannelName>
-                    <TextViewUserInLive>
-                      <IconEyeStyled source={Icon_Image.eye_ic} />  10</TextViewUserInLive>
-                  </View>
-                </DirectionRow>
-                <TouchableOpacity onPress={async () => {
-                  await this.endCall()
-                }}>
-                  <IconClose source={Icon_Image.close_ic} />
-                </TouchableOpacity>
-              </ViewHeaderCallInfo>
-
-              <ViewFooter >
-                <ScrollViewMessage>
-                  {message.map((v, ind) => {
-                    return (
-                      <View key={ind} style={{ marginVertical: 5, flexDirection: "row", alignItems: "center" }}>
-                        <Image source={Icon_Image.image_boy_profile} style={{ height: 25, width: 25, borderRadius: 13 }} />
-                        <ViewInfoDetailMessage>
-                          <Text style={{ color: "white" }}>{v.name}:{v.message}</Text>
-                        </ViewInfoDetailMessage>
-                      </View>
-                    )
-                  })}
-                </ScrollViewMessage>
-                <ViewTabBarOption>
-                  <ButtonOption
-                    onPress={() => { }}>
-                    <IconOption source={Icon_Image.shopping_bag} />
-                  </ButtonOption>
-                  <ViewCommentOption>
-                    <TextInputComment
-                      value={comment}
-                      onChangeText={(t) => { this.setState({ comment: t }) }}
-                      placeholder="comment..."
-                      placeholderTextColor="white"
-                    // onSubmitEditing={Keyboard.dismiss}
-                    />
-                    <TouchableOpacity
-                      onPress={async () => {
-                        comment ? await this._onPressSend() : null;
-                      }}
-                    >
-                      <IconOption source={Icon_Image.send_ic} />
-                    </TouchableOpacity>
-                  </ViewCommentOption>
-                  <ButtonOption
-                    onPress={() => { }}>
-                    <IconOption source={Icon_Image.share} />
-                  </ButtonOption>
-                  <ButtonOption
-                    onPress={() => { }}>
-                    <IconOption source={Icon_Image.heart_ic} />
-                  </ButtonOption>
-                </ViewTabBarOption>
-                <View />
-              </ViewFooter>
-            </ViewKey>
-            {/* </ScrollView> */}
-          </KeyboardAvoidingViewStyled>
-        </ViewAbsoluteAllRender>}
+                <ViewFooter >
+                  <ScrollViewMessage>
+                    {message.map((v, ind) => {
+                      return (
+                        <View key={ind} style={{ marginVertical: 5, flexDirection: "row", alignItems: "center" }}>
+                          <Image source={Icon_Image.image_boy_profile} style={{ height: 25, width: 25, borderRadius: 13 }} />
+                          <ViewInfoDetailMessage>
+                            <Text style={{ color: "white" }}>{v.name}:{v.message}</Text>
+                          </ViewInfoDetailMessage>
+                        </View>
+                      )
+                    })}
+                  </ScrollViewMessage>
+                  <ViewTabBarOption>
+                    <ButtonOption
+                      onPress={() => { }}>
+                      <IconOption source={Icon_Image.shopping_bag} />
+                    </ButtonOption>
+                    <ViewCommentOption>
+                      <TextInputComment
+                        value={comment}
+                        onChangeText={(t) => { this.setState({ comment: t }) }}
+                        placeholder="comment..."
+                        placeholderTextColor="white"
+                      />
+                      <TouchableOpacity
+                        onPress={async () => {
+                          comment ? await this._onPressSend() : null;
+                        }}
+                      >
+                        <IconOption source={Icon_Image.send_ic} />
+                      </TouchableOpacity>
+                    </ViewCommentOption>
+                    <ButtonOption
+                      onPress={() => { }}>
+                      <IconOption source={Icon_Image.share} />
+                    </ButtonOption>
+                    <ButtonOption
+                      onPress={() => { }}>
+                      <IconOption source={Icon_Image.heart_ic} />
+                    </ButtonOption>
+                  </ViewTabBarOption>
+                  <View />
+                </ViewFooter>
+              </ViewKey>
+            </KeyboardAvoidingViewStyled>
+          </ViewAbsoluteAllRender>
+        </> : <ViewTurnOffLive source={Icon_Image.friends_image_home_screen}>
+          {this._renderEndCall()}
+        </ViewTurnOffLive>}
       </View>
     ) : null;
   };
@@ -707,22 +620,6 @@ marginHorizontal: 5px
 const IconEyeStyled = styled.Image`
 width: 10px;
 height: 10px
-`
-const StartLiveButton = styled.TouchableOpacity`
-paddingHorizontal: 16px;
-paddingVertical: 8px;
-backgroundColor: red;
-marginBottom: 16px;
-borderRadius: 30px;
-width: 60px;
-height: 60px;
-justifyContent: center
-alignItems: center
-`
-const TextStartLiveButton = styled.Text`
-color: white
-fontWeight: bold;
-fontSize: 13px
 `
 /**
  * @name styled renderCall
@@ -835,6 +732,17 @@ height: 40px
 borderRadius: 25px
 color: white
 padding: 5px
+`
+const ViewTurnOffLive = styled.ImageBackground`
+justifyContent:center;
+alignItems:center;
+height: ${Dimensions.get("window").height - 80}px
+width:100%
+`
+const TextTurnOffLive = styled.Text`
+color:red;
+fontSize:18px
+fontWeight:bold
 `
 
 
