@@ -14,7 +14,8 @@ import {
   Alert,
   Dimensions,
   Keyboard,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  Animated
 } from 'react-native';
 import RtcEngine, {
   RtcRemoteView,
@@ -61,9 +62,11 @@ interface State {
   comment: string;
   timer: number;
   message: Message[];
-  keyboardStatus: any
+  keyboardStatus: any;
+  animation: any;
+  _open:any
 }
-class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, State> {
+class StartLiveLayout extends Component<{ navigation, userLogin, requestLiveThunk, data }, State> {
   _rtcEngine?: RtcEngine;
   _rtmEngine?: RtmEngine;
   constructor(props?: State & any) {
@@ -73,7 +76,7 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
       token: null,
       channelName: "",
       inCall: false,
-      input: 'live stream ' + new Date().getTime(),
+      input: 'live stream ',
       inLobby: false,
       peerIds: [],
       seniors: [],
@@ -84,7 +87,9 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
       comment: "",
       timer: 0,
       message: [],
-      keyboardStatus: undefined
+      keyboardStatus: undefined,
+      animation: new Animated.Value(0),
+      _open:false
     };
     if (Platform.OS === 'android') {
       requestCameraAndAudioPermission().then(() => {
@@ -149,6 +154,7 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
     this.initRTC();
     this.initRTM();
     this._request();
+
   }
 
   componentWillUnmount = async () => {
@@ -161,18 +167,15 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
    * @description initRTC sử lý các sự kiện của rtc engine
    */
   initRTC = async () => {
-    const { appId, role, inCall, inLobby } = this.state;
-    console.log(inLobby, "init");
+    const { appId } = this.state;
     this._rtcEngine = await RtcEngine.createWithConfig(
       new RtcEngineConfig(appId)
     )
-    console.log(role);
-    
-    await role ? this._rtcEngine.enableVideo() : this._rtcEngine.disableVideo();
+    await this._rtcEngine.enableVideo();
     await this._rtcEngine.setChannelProfile(ChannelProfile.LiveBroadcasting)
     await this._rtcEngine.setDefaultAudioRoutetoSpeakerphone(true);
-    await this._rtcEngine.setClientRole(!role ? ClientRole.Audience : ClientRole.Broadcaster)
-    await !role ? this._rtcEngine.disableAudio() : this._rtcEngine.enableAudio();
+    await this._rtcEngine.setClientRole(ClientRole.Broadcaster)
+    await this._rtcEngine.enableAudio();
     this._addListener(this._rtcEngine);
   };
   /**
@@ -182,8 +185,6 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
    */
   _addListener = (_rtcEngine) => {
     const { appId, role, inCall, inLobby, myUsername } = this.state;
-    console.log(myUsername);
-
     _rtcEngine.addListener('Error', (err) => {
       console.log('Error', err);
     });
@@ -280,16 +281,22 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
     _rtmEngine.on('channelMessageReceived', (evt) => {
       let { text } = evt;
       let data = text.split(':');
+      console.log(data,"channel");
+      
       this.setState({ rooms: { ...this.state.rooms, [data[0]]: data[1] } });
     });
     _rtmEngine.on('messageReceived', (evt) => {
+      
       let { text } = evt;
       let data = text.split(':');
+      console.log(data,"none");
       this.setState({ rooms: { ...this.state.rooms, [data[0]]: data[1] } });
     });
     _rtmEngine.on('channelMemberJoined', (evt) => {
       let { channelName, seniors, peerIds, inCall } = this.state;
       let { channelId, uid } = evt;
+      console.log("channelMemberJoined");
+      
       if (inCall && channelId === 'lobby' && seniors.length < 2) {
         this._rtmEngine
           ?.sendMessageToPeer({
@@ -302,6 +309,8 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
     });
     _rtmEngine.on('channelMemberLeft', (evt) => {
       let { channelId, uid } = evt;
+      console.log("channelMemberLeft");
+      
       let { channelName, seniors, inCall, peerIds, rooms } = this.state;
       if (channelName === channelId) {
         this.setState({
@@ -326,11 +335,9 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
    */
 
   joinCall = async (channelName: any, role: boolean) => {
-    // console.log(channelName);
-    console.log(channelName+'role -----'+ this.state.role);
-    this.setState({ channelName: channelName, 
-      // role: role
-     });
+    this.setState({
+      channelName: channelName,
+    });
     let { token } = this.state;
     await this._rtcEngine?.joinChannel(token, channelName, null, 0);
     await this._rtmEngine?.joinChannel(channelName)
@@ -340,13 +347,12 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
     );
     if (members.length === 1) {
       await this._rtmEngine
-        ?.sendMessageByChannelId('lobby', channelName + ':' + 1)
+        ?.sendMessageByChannelId('lobby', channelName + ':' + 2 + "/" + 0)
         .catch((e) => console.log(e));
     }
     this.setState({
       inLobby: false,
       seniors: members.map((m: any) => m.uid),
-      // role: role
     });
   };
   endCall = async () => {
@@ -378,15 +384,24 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
       role: false
     });
   };
+  toggle=()=>{
+    const toValue = this.state._open?0:1;
+    Animated.timing(
+      this.state.animation,
+      {
+        toValue,
+        duration: 3000,
+        useNativeDriver: false
+      }).start();
+      this.setState({_open:!this.state._open})
+  }
   /**
    * @returns all render cần thiết
    */
   render() {
     const { inCall, channelName, inLobby, role } = this.state;
     return (
-
       <SafeAreaView style={styles.max}>
-
         {!inCall && <GoBackLayout title="Live Streaming Start"
           onClickIcon={() => {
             this.props.navigation.goBack();
@@ -404,14 +419,18 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
    * @returns render ra danh sách live đang 
    */
   _renderRooms = () => {
-    const { inLobby, rooms, input, data, comment } = this.state;
+    const { inLobby, input, data, comment } = this.state;
     return inLobby ? (
-      <View style={{flex:1}}>
-        <ViewLiveStart source={Icon_Image.image_live_example}>
-          
+      <View style={{ flex: 1 }}>
+        <ViewLiveStart >
+          <Image source={Icon_Image.live_image_live_stream_screen} style={{
+            width: "50%",
+            height: 260,
+          }} />
+          <TextStartLive>Hãy kết nối với mọi người bằng cách bắt đầu live stream hoặc thưởng thức live stream nào ...</TextStartLive>
           <StartLiveButton
-            onPress={ () => {
-                 this.setState({ role: true },()=>this.joinCall(input, true))
+            onPress={() => {
+              this.setState({ role: true }, () => this.joinCall(this.props.userLogin.email, true))
             }}>
             <TextStartLiveButton >Live</TextStartLiveButton>
           </StartLiveButton>
@@ -423,22 +442,22 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
    * @name renderCall 
    * @returns render ra màn hình call khi gọi tới
    */
+
   _renderCall = () => {
     const { inCall, peerIds, channelName, data, comment, message, role } = this.state;
     return inCall ? (
       <View style={{}}>
-       <RtcLocalView.SurfaceView
+        <RtcLocalView.SurfaceView
           style={styles.video}
           channelId={channelName}
           renderMode={VideoRenderMode.Hidden}
         />
-
         {data?.filter((e) => e.channel === channelName && e.status).length != 0 && <ViewAbsoluteAllRender >
           <KeyboardAvoidingViewStyled
             style={{ flex: 1 }}
             enabled
             behavior={(Platform.OS !== 'ios' && 'padding') || undefined}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 135 : 85}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 85 : 85}
           >
             <ViewKey>
               <ViewHeaderCallInfo>
@@ -499,21 +518,46 @@ class StartLiveLayout extends Component<{ navigation, requestLiveThunk, data }, 
                     <IconOption source={Icon_Image.share} />
                   </ButtonOption>
                   <ButtonOption
-                    onPress={() => { }}>
-                    <IconOption source={Icon_Image.heart_ic} />
+                    onPress={() => {
+                      this.toggle()
+                    }}>
+                    <IconOption source={Icon_Image.heart_ic}
+                    />
                   </ButtonOption>
                 </ViewTabBarOption>
                 <View />
               </ViewFooter>
             </ViewKey>
           </KeyboardAvoidingViewStyled>
+          <Animated.Image source={Icon_Image.heart_ic}
+            style={{
+              width: 20,
+              height: 20,
+              position:"absolute",
+              marginTop:Dimensions.get("window").height,
+              top:this.state.animation.interpolate({
+                inputRange: [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7, 0.8,0.9,1],
+                outputRange: [0,-100,-170,-210,-300,-350,-400,-480,-590,-650,-Dimensions.get("window").height]
+              }),
+              left: this.state.animation.interpolate({
+                inputRange: [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7, 0.8,0.9, 1],
+                outputRange: [20, 60, 20, 70, 20,40,20,80,30,10,50]
+              }),
+              transform:[{
+                scale:this.state.animation.interpolate({
+                  inputRange: [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9, 1],
+                  outputRange: [0.1,0.2,0.3,0.5,0.6,0.9,1, 1,0.7,0.5,0]
+                }),
+              }]
+            }} />
         </ViewAbsoluteAllRender>}
       </View>
     ) : null;
   };
 }
-const mapStateToProps = (state: GenericListInitialState<Live>) => ({
-  data: state.data
+const mapStateToProps = (state) => ({
+  data: state.data,
+  userLogin: state.loginUserReducer.userLogin,
 });
 
 const mapDispatchToProps = (dispatch) => ({
@@ -538,7 +582,8 @@ borderRadius: 30px;
 width: 60px;
 height: 60px;
 justifyContent: center
-alignItems: center
+alignItems: center;
+marginTop:30px
 `
 const TextStartLiveButton = styled.Text`
 color: white
@@ -658,12 +703,17 @@ color: white
 padding: 5px
 `
 
-const ViewLiveStart=styled.ImageBackground`
+const ViewLiveStart = styled.View`
 alignItems:center;
 justifyContent:center;
 width:${Dimensions.get("window").width}px;
-height:${Dimensions.get("window").height-80}px
+height:${Dimensions.get("window").height - 80}px
 `
-
+const TextStartLive = styled.Text`
+marginTop: 10px;
+fontSize:10px;
+textAlign: center ;
+marginHorizontal:30px
+`
 
 

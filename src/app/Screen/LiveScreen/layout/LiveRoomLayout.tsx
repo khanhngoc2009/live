@@ -108,8 +108,8 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
   _onPressSend = async () => {
     const { comment, message } = this.state
     if (comment) {
-      console.log(comment);
       const streamId = await this._rtcEngine?.createDataStreamWithConfig({});
+      const channelId=await this._rtmEngine?.createClient
       await this._rtcEngine?.sendStreamMessage(streamId!, comment);
       this.setState({
         message:
@@ -163,15 +163,16 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    */
   initRTC = async () => {
     const { appId, inLobby } = this.state;
-
     this._rtcEngine = await RtcEngine.createWithConfig(
       new RtcEngineConfig(appId)
     )
     await this._rtcEngine.enableVideo();
-    await this._rtcEngine.setChannelProfile(ChannelProfile.LiveBroadcasting)
+    await this._rtcEngine.setChannelProfile(ChannelProfile.Communication)
     await this._rtcEngine.setDefaultAudioRoutetoSpeakerphone(true);
-    await this._rtcEngine.setClientRole(ClientRole.Audience)
-    await this._rtcEngine.enableAudio();
+    await this._rtcEngine.setClientRole(ClientRole.Broadcaster)
+    await this._rtcEngine.enableVideo();
+    await this._rtcEngine.muteLocalAudioStream(true);
+    await this._rtcEngine.muteLocalVideoStream(true);
     this._addListener(this._rtcEngine);
   };
   /**
@@ -266,12 +267,16 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     });
     _rtmEngine.on('messageReceived', (evt) => {
       let { text } = evt;
+      console.log(text,"messageReceived");
       let data = text.split(':');
+      
       this.setState({ rooms: { ...this.state.rooms, [data[0]]: data[1] } });
     });
     _rtmEngine.on('channelMemberJoined', (evt) => {
       let { channelName, seniors, peerIds, inCall } = this.state;
       let { channelId, uid } = evt;
+      console.log("channelMemberJoined");
+      
       if (inCall && channelId === 'lobby' && seniors.length < 2) {
         this._rtmEngine
           ?.sendMessageToPeer({
@@ -282,6 +287,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
       }
     });
     _rtmEngine.on('channelMemberLeft', (evt) => {
+      console.log("channelMemberLeft");
       let { channelId, uid } = evt;
       let { channelName, seniors, inCall, peerIds, rooms } = this.state;
       if (channelName === channelId) {
@@ -310,9 +316,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
   joinCall = async (channelName: any, role: boolean) => {
     this.setState({
       channelName: channelName,
-      // role: role
     });
-
     let { token } = this.state;
     await this._rtcEngine?.joinChannel(token, channelName, null, 0);
     await this._rtmEngine?.joinChannel(channelName)
@@ -322,13 +326,12 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
     );
     if (members.length === 1) {
       await this._rtmEngine
-        ?.sendMessageByChannelId('lobby', channelName + ':' + 1)
+        ?.sendMessageByChannelId('lobby', channelName + ':' + 1+':'+0)
         .catch((e) => console.log(e));
     }
     this.setState({
       inLobby: false,
       seniors: members.map((m: any) => m.uid),
-      // role: role
     });
   };
   endCall = async () => {
@@ -339,7 +342,6 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
         .catch((e) => console.log(e));
     }
     await this._rtcEngine?.leaveChannel();
-
     await this._rtmEngine?.logout();
     await this._rtmEngine?.login({ uid: myUsername });
     await this._rtmEngine?.joinChannel('lobby');
@@ -350,7 +352,6 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
       seniors: [],
       channelName: '',
       role: false,
-      
     });
   };
   _renderEndCall = () => {
@@ -370,9 +371,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
   render() {
     const { inCall, channelName, inLobby, role } = this.state;
     return (
-
       <SafeAreaView style={styles.max}>
-
         {!inCall && <GoBackLayout title="Live Room"
           onClickIcon={() => {
             this.props.navigation.goBack();
@@ -440,8 +439,6 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
    */
   _renderCall = () => {
     const { inCall, peerIds, channelName, data, comment, message } = this.state;
-    console.log(peerIds);
-
     return inCall ? (
       <View style={{}}>
         {peerIds?.length != 0 ? <>
@@ -463,7 +460,7 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
               style={{ flex: 1 }}
               enabled
               behavior={(Platform.OS !== 'ios' && 'padding') || undefined}
-              keyboardVerticalOffset={Platform.OS === "ios" ? 135 : 85}
+              keyboardVerticalOffset={85}
             >
               <ViewKey>
                 <ViewHeaderCallInfo>
@@ -486,14 +483,14 @@ class LiveRoomLayout extends Component<{ navigation, requestLiveThunk, data }, S
                   </TouchableOpacity>
                 </ViewHeaderCallInfo>
 
-                <ViewFooter >
+                <ViewFooter>
                   <ScrollViewMessage>
                     {message.map((v, ind) => {
                       return (
                         <View key={ind} style={{ marginVertical: 5, flexDirection: "row", alignItems: "center" }}>
                           <Image source={Icon_Image.image_boy_profile} style={{ height: 25, width: 25, borderRadius: 13 }} />
                           <ViewInfoDetailMessage>
-                            <Text style={{ color: "white" }}>{v.name}:{v.message}</Text>
+                          <Text style={{ color:"white" }}>{v.name}:{v.message}</Text>
                           </ViewInfoDetailMessage>
                         </View>
                       )
@@ -688,7 +685,7 @@ justifyContent: space-between
 const ScrollViewMessage = styled.ScrollView`
 paddingHorizontal: 20px
 marginVertical: 15px
-width: 70%
+width: 100%
 height: 250px
 `
 const ViewInfoDetailMessage = styled.View`
